@@ -1,12 +1,6 @@
+import type { NetworkSimulator } from './simulator'
 import type { PingResult } from './types'
 
-export function ping(source: string, destination: string): PingResult {
-  return {
-    success: false,
-    source,
-    destination,
-    packetLoss: 100,
-    hops: [],
-    failureReason: 'Simulator not yet implemented',
-  }
+export function ping(simulator: NetworkSimulator, source: string, destination: string): PingResult {
+  return simulator.ping(source, destination)
 }

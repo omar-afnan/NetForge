@@ -1,16 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #0a0e17;
-  --bg-panel: rgba(15, 23, 42, 0.75);
-  --border-subtle: rgba(56, 189, 248, 0.15);
-  --accent-cyan: #22d3ee;
-  --accent-purple: #a855f7;
-  --accent-green: #22c55e;
-  --accent-red: #ef4444;
-  --accent-orange: #f59e0b;
-  --text-primary: #e2e8f0;
-  --text-muted: #94a3b8;
+  --bg-root: #060a0f;
+  --bg-panel: #0c1219;
+  --bg-elevated: #121a24;
+  --bg-inset: #080d13;
+  --border: #1e2a38;
+  --border-bright: #2f4358;
+  --text-primary: #e8eef5;
+  --text-secondary: #9aadc4;
+  --text-dim: #5f7389;
+  --accent-link: #2ec8f0;
+  --accent-link-dim: rgba(46, 200, 240, 0.15);
+  --accent-amber: #f0b429;
+  --status-up: #34d399;
+  --status-down: #f87171;
+  --status-warn: #fbbf24;
+  --glow-cyan: 0 0 24px rgba(46, 200, 240, 0.12);
+  --glow-panel: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
 }
 
 * {
@@ -25,9 +32,253 @@ body,
 }
 
 body {
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background-color: var(--bg-primary);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(46, 200, 240, 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(52, 211, 153, 0.04), transparent),
+    var(--bg-root);
   color: var(--text-primary);
+  font-size: 13px;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+}
+
+body.glow-off {
+  --glow-cyan: none;
+  --glow-panel: none;
+}
+
+.font-data {
+  font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+}
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--glow-panel);
+}
+
+.panel-header {
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-panel) 100%);
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.grid-bg {
+  background-color: var(--bg-inset);
+}
+
+.grid-bg.show-grid {
+  background-image:
+    linear-gradient(rgba(46, 200, 240, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(46, 200, 240, 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.grid-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(6, 10, 15, 0.5) 100%);
+}
+
+.status-up {
+  color: var(--status-up);
+}
+
+.status-down {
+  color: var(--status-down);
+}
+
+.status-warn {
+  color: var(--status-warn);
+}
+
+.nav-active {
+  border-color: var(--border-bright) !important;
+  background: linear-gradient(90deg, var(--accent-link-dim) 0%, var(--bg-elevated) 100%) !important;
+  color: var(--text-primary) !important;
+  box-shadow: inset 3px 0 0 var(--accent-link);
+}
+
+.stat-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--stat-accent, var(--accent-link));
+}
+
+.stat-card::after {
+  content: '';
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--stat-accent, var(--accent-link));
+  opacity: 0.06;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--border-bright);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.badge-cyan {
+  border-color: rgba(46, 200, 240, 0.35);
+  color: var(--accent-link);
+  background: rgba(46, 200, 240, 0.08);
+}
+
+.badge-green {
+  border-color: rgba(52, 211, 153, 0.35);
+  color: var(--status-up);
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.difficulty-beginner {
+  border-color: rgba(52, 211, 153, 0.35);
+  color: var(--status-up);
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.difficulty-intermediate {
+  border-color: rgba(240, 180, 41, 0.35);
+  color: var(--accent-amber);
+  background: rgba(240, 180, 41, 0.08);
+}
+
+.difficulty-advanced {
+  border-color: rgba(248, 113, 113, 0.35);
+  color: var(--status-down);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.btn-primary {
+  padding: 6px 12px;
+  border: 1px solid rgba(46, 200, 240, 0.4);
+  background: rgba(46, 200, 240, 0.12);
+  color: var(--accent-link);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-primary:hover {
+  background: rgba(46, 200, 240, 0.2);
+  border-color: var(--accent-link);
+}
+
+.btn-ghost {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.btn-ghost:hover {
+  color: var(--text-secondary);
+  border-color: var(--border-bright);
+}
+
+.select-field {
+  padding: 5px 8px;
+  border: 1px solid var(--border-bright);
+  background: var(--bg-root);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.select-field:focus {
+  border-color: var(--accent-link);
+}
+
+.select-field:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pulse-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-up);
+  box-shadow: 0 0 6px var(--status-up);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@keyframes link-pulse {
+  0%, 100% { stroke-opacity: 0.45; }
+  50% { stroke-opacity: 0.85; }
+}
+
+.link-pulse {
+  animation: link-pulse 2.5s ease-in-out infinite;
+}
+@keyframes link-flow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -120.4;
+  }
+}
+
+/* Packet dots flowing along a cable. Dash period is 30.1 (0.1 + 30),
+   and the keyframe offset is 4 periods, so the loop is seamless. */
+.link-flow {
+  stroke-linecap: round;
+  animation: link-flow 2.2s linear infinite;
+}
+
+.table-compact td,
+.table-compact th {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #243040;
+  border: 1px solid var(--border);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-inset);
 }

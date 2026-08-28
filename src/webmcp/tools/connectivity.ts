@@ -1,16 +1,17 @@
 import type { WebMCPToolResult } from '../types'
-import { checkConnectivity } from '@/network/diagnostics'
-import { ping } from '@/network/ping'
-import { traceRoute } from '@/network/traceroute'
+import { useNetworkStore } from '@/store/networkStore'
 
 export function pingTool(source: string, destination: string): WebMCPToolResult {
-  return { success: true, data: ping(source, destination) }
+  const { simulator } = useNetworkStore.getState()
+  return { success: true, data: simulator.ping(source, destination) }
 }
 
 export function traceRouteTool(source: string, destination: string): WebMCPToolResult {
-  return { success: true, data: traceRoute(source, destination) }
+  const { simulator } = useNetworkStore.getState()
+  return { success: true, data: simulator.traceRoute(source, destination) }
 }
 
 export function checkConnectivityTool(source: string, destination: string): WebMCPToolResult {
-  return { success: true, data: checkConnectivity(source, destination) }
+  const { simulator } = useNetworkStore.getState()
+  return { success: true, data: simulator.checkConnectivity(source, destination) }
 }

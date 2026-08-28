@@ -1,11 +1,10 @@
+import type { NetworkSimulator } from './simulator'
 import type { DiagnosticResult } from './types'
 
-export function checkConnectivity(source: string, destination: string): DiagnosticResult {
-  return {
-    success: false,
-    source,
-    destination,
-    hops: [],
-    failureReason: 'Diagnostics not yet implemented',
-  }
+export function checkConnectivity(
+  simulator: NetworkSimulator,
+  source: string,
+  destination: string,
+): DiagnosticResult {
+  return simulator.checkConnectivity(source, destination)
 }

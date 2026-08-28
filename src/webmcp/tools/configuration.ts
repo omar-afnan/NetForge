@@ -1,6 +1,5 @@
 import type { WebMCPToolResult } from '../types'
 import type { ProposedFix } from '@/network/types'
-import { ping } from '@/network/ping'
 import { useNetworkStore } from '@/store/networkStore'
 
 export function proposeConfigurationChange(
@@ -38,5 +37,6 @@ export function applyConfigurationChange(fixId: string): WebMCPToolResult {
 }
 
 export function verifyFix(source: string, destination: string): WebMCPToolResult {
-  return { success: true, data: ping(source, destination) }
+  const { simulator } = useNetworkStore.getState()
+  return { success: true, data: simulator.ping(source, destination) }
 }

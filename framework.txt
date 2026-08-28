@@ -1,0 +1,1181 @@
+You are building a competition-ready web application called NETFORGE.
+
+PROJECT NAME:
+NetForge
+
+TAGLINE:
+"A network that agents can actually debug."
+
+CORE DESCRIPTION:
+NetForge is an agent-native network troubleshooting laboratory where humans and AI agents collaborate to inspect, diagnose, explain, repair, and verify simulated network problems.
+
+The primary purpose of this project is to demonstrate the power of WebMCP by allowing an AI agent to interact with a live network simulation through structured tools exposed by the website.
+
+This is being built for an OpenAI/WebMCP competition. The project must prioritize:
+1. Genuine WebMCP integration
+2. Excellent execution and reliability
+3. Clear real-world usefulness
+4. Creativity and ambition
+5. A polished, impressive demo experience
+
+DO NOT build this as a generic AI chatbot.
+DO NOT make fake WebMCP buttons that only simulate tool calls.
+DO NOT hardcode fake agent responses.
+The network simulator and WebMCP tools must actually operate on the same underlying application state.
+
+==================================================
+TECH STACK
+==================================================
+
+Use the following stack:
+
+FRONTEND:
+- React
+- TypeScript
+- Vite
+
+UI:
+- Tailwind CSS
+- Lucide React for icons
+- Custom dark futuristic networking-lab visual design
+
+NETWORK TOPOLOGY:
+- React Flow
+
+STATE MANAGEMENT:
+- Zustand
+
+WEBMCP:
+- Use the actual WebMCP browser API and tool registration mechanism available in the target environment.
+- WebMCP tools should be registered from the browser/application.
+- Do not invent a fake WebMCP API.
+- Keep WebMCP integration isolated inside src/webmcp/.
+
+OPTIONAL BACKEND:
+- Node.js only if genuinely required
+- Express only if genuinely required
+
+DATABASE:
+- Do NOT add Supabase initially.
+- The MVP should work completely without authentication or a database.
+- Local/in-memory state is sufficient.
+- Design the architecture so persistence can be added later.
+
+DEPLOYMENT:
+- Vercel, Netlify, Cloudflare Pages, or another suitable static/web deployment platform.
+
+IMPORTANT:
+Keep the initial application as client-side as possible.
+Do not introduce unnecessary infrastructure.
+
+==================================================
+PROJECT ARCHITECTURE
+==================================================
+
+Use a clean architecture similar to:
+
+src/
+├── components/
+│   ├── layout/
+│   ├── topology/
+│   ├── devices/
+│   ├── copilot/
+│   ├── terminal/
+│   ├── diagnostics/
+│   ├── packets/
+│   ├── issues/
+│   └── common/
+│
+├── network/
+│   ├── types.ts
+│   ├── devices.ts
+│   ├── interfaces.ts
+│   ├── links.ts
+│   ├── routing.ts
+│   ├── arp.ts
+│   ├── packets.ts
+│   ├── ping.ts
+│   ├── traceroute.ts
+│   ├── diagnostics.ts
+│   ├── simulator.ts
+│   └── failures.ts
+│
+├── store/
+│   ├── networkStore.ts
+│   ├── copilotStore.ts
+│   └── uiStore.ts
+│
+├── webmcp/
+│   ├── registerTools.ts
+│   ├── types.ts
+│   └── tools/
+│       ├── topology.ts
+│       ├── device.ts
+│       ├── interfaces.ts
+│       ├── routing.ts
+│       ├── arp.ts
+│       ├── connectivity.ts
+│       ├── diagnostics.ts
+│       └── configuration.ts
+│
+├── data/
+│   └── labs/
+│       ├── starterLab.ts
+│       ├── routingFailure.ts
+│       ├── gatewayFailure.ts
+│       └── interfaceFailure.ts
+│
+├── App.tsx
+└── main.tsx
+
+==================================================
+VISUAL DESIGN
+==================================================
+
+The application should look like a professional network operations center combined with a modern AI developer tool.
+
+Use the provided NetForge concept image as the visual design reference.
+
+Design characteristics:
+
+- Dark navy/black background
+- Subtle grid pattern
+- Neon blue/cyan network connections
+- Purple accents for AI-related elements
+- Green for healthy systems
+- Red for failures
+- Orange/yellow for warnings and human approval
+- Glass/technical dashboard panels
+- Thin borders
+- Soft glow effects
+- Professional typography
+- Avoid excessive rounded "AI startup" cards
+- Avoid looking like a generic SaaS template
+
+The UI should feel like:
+- Cisco/network operations tooling
+- modern developer tooling
+- futuristic SOC/NOC dashboard
+- AI agent interface
+
+Do not sacrifice usability for visual effects.
+
+==================================================
+MAIN APPLICATION LAYOUT
+==================================================
+
+Create a dashboard with:
+
+LEFT SIDEBAR:
+- NetForge logo
+- Dashboard
+- Topology
+- Traffic
+- Issues
+- Agents
+- Reports
+- Lab Library
+- Settings
+
+BOTTOM OF SIDEBAR:
+- Current environment
+- Competition Lab
+
+MAIN AREA:
+Large interactive network topology.
+
+RIGHT SIDEBAR:
+NetOps Copilot.
+
+BOTTOM PANEL:
+Network statistics and/or terminal/packet inspector.
+
+==================================================
+NETWORK TOPOLOGY
+==================================================
+
+Use React Flow.
+
+The topology must contain actual interactive network nodes.
+
+Supported device types:
+
+1. PC
+2. Switch
+3. Router
+4. Server
+
+Each device should have:
+
+- ID
+- hostname
+- device type
+- interfaces
+- IP addresses
+- subnet masks
+- MAC addresses
+- operational status
+- connected links
+
+Example devices:
+
+PC-01
+IP: 10.1.10.10
+
+PC-02
+IP: 10.1.10.11
+
+PC-03
+IP: 10.1.10.12
+
+SW-01
+IP: 10.1.1.2
+
+SW-02
+IP: 10.1.1.3
+
+SW-03
+IP: 10.1.1.4
+
+R-01
+IP: 10.1.0.1
+
+R-02
+IP: 10.1.0.2
+
+R-03
+IP: 10.1.0.3
+
+SRV-01
+10.1.20.10
+Web Server
+
+SRV-02
+10.1.20.11
+Application Server
+
+SRV-03
+10.1.20.12
+Database Server
+
+SRV-04
+10.1.20.13
+File Server
+
+These are example values only. The architecture must support changing them.
+
+==================================================
+NETWORK SIMULATION ENGINE
+==================================================
+
+Create a simplified but logically correct network simulation.
+
+DO NOT attempt to emulate an entire Cisco IOS environment.
+
+The simulator should understand:
+
+- IPv4 addressing
+- subnet masks
+- network addresses
+- host addresses
+- default gateways
+- interfaces
+- interface status
+- connected routes
+- static routes
+- next-hop routing
+- ARP tables
+- basic packet forwarding
+- ping
+- traceroute
+- connectivity failures
+
+The simulator should calculate results based on actual network state.
+
+Example:
+
+PC-01
+IP: 10.1.10.10
+Mask: 255.255.255.0
+Gateway: 10.1.10.1
+
+If the gateway is changed to:
+
+10.1.20.1
+
+the simulator should actually recognize that this is incorrect for the simulated topology.
+
+==================================================
+NETWORK STATE
+==================================================
+
+Create strongly typed TypeScript models.
+
+Example conceptual types:
+
+Device
+NetworkInterface
+NetworkLink
+Route
+ARPEntry
+Packet
+PingResult
+TraceHop
+NetworkIssue
+DiagnosticResult
+ProposedFix
+AgentAction
+
+Do not use "any" unless absolutely necessary.
+
+==================================================
+NETWORK DIAGNOSTICS
+==================================================
+
+Implement actual diagnostic functions.
+
+Required:
+
+1. Ping
+
+ping(source, destination)
+
+Should determine whether the destination is reachable.
+
+Return structured information such as:
+
+- success
+- source
+- destination
+- latency
+- packet loss
+- hops
+- failure reason
+
+Example failure reasons:
+
+- Destination unreachable
+- Invalid default gateway
+- Interface down
+- Missing route
+- Link down
+- ARP resolution failed
+
+2. Traceroute
+
+traceRoute(source, destination)
+
+Return each hop.
+
+Example:
+
+PC-01
+→ SW-01
+→ R-01
+→ R-02
+→ destination
+
+If routing fails:
+
+PC-01
+→ SW-01
+→ R-01
+→ R-02
+→ X ROUTE NOT FOUND
+
+3. ARP
+
+getARPTable(device)
+
+Return actual ARP entries based on simulated state.
+
+4. Routing
+
+getRoutingTable(device)
+
+Return:
+
+- connected routes
+- static routes
+- next hops
+- interfaces
+- route status
+
+5. Interface status
+
+getInterfaceStatus(device)
+
+6. Connectivity analysis
+
+checkConnectivity(source, destination)
+
+Return a detailed structured diagnosis.
+
+==================================================
+FAILURE INJECTION
+==================================================
+
+This is a major feature.
+
+Create "Break My Network".
+
+The user should be able to intentionally introduce network failures.
+
+Supported failures:
+
+- Wrong IP address
+- Wrong subnet mask
+- Wrong default gateway
+- Missing static route
+- Incorrect next hop
+- Interface shutdown
+- Link failure
+- ARP problem
+- Incorrect routing configuration
+
+Create predefined labs.
+
+Example:
+
+LAB: "The Missing Route"
+
+PC-01 cannot reach SRV-03.
+
+Cause:
+R-02 does not have a route to the destination network.
+
+The agent must discover this through inspection.
+
+Do NOT tell the agent the answer directly.
+
+==================================================
+NETOPS COPILOT
+==================================================
+
+Create a right-side AI assistant called:
+
+NetOps Copilot
+
+Intro:
+
+"Hi! I'm your NetOps Copilot.
+I can inspect, diagnose, and help you resolve network issues end-to-end."
+
+The intended workflow is:
+
+1. Inspect
+2. Diagnose
+3. Explain
+4. Propose Fix
+5. Ask Human
+6. Apply Fix
+7. Verify
+
+This workflow should be visible in the UI.
+
+==================================================
+WEBMCP INTEGRATION
+==================================================
+
+This is the MOST IMPORTANT part of the project.
+
+Expose real WebMCP tools from the application.
+
+The tools must operate directly on the live network simulator state.
+
+Create tools approximately like:
+
+1. get_network_topology
+
+Description:
+Retrieve the current network topology, devices, and links.
+
+2. get_device_config
+
+Input:
+device
+
+Returns:
+- hostname
+- device type
+- interfaces
+- IP addresses
+- subnet masks
+- gateway
+- status
+
+3. get_interface_status
+
+Input:
+device
+interface
+
+Returns operational state.
+
+4. get_routing_table
+
+Input:
+device
+
+Returns routing table.
+
+5. get_arp_table
+
+Input:
+device
+
+Returns ARP entries.
+
+6. ping
+
+Input:
+source
+destination
+
+Runs the ACTUAL network simulator ping.
+
+7. trace_route
+
+Input:
+source
+destination
+
+Runs the ACTUAL simulator traceroute.
+
+8. check_connectivity
+
+Input:
+source
+destination
+
+Performs diagnostic analysis.
+
+9. get_network_issues
+
+Returns currently detected issues.
+
+10. propose_configuration_change
+
+Input:
+device
+change
+
+This should NOT immediately modify the network.
+
+It creates a pending proposed fix.
+
+11. apply_configuration_change
+
+Only applies an approved change.
+
+12. verify_fix
+
+Runs connectivity tests after the fix.
+
+==================================================
+WEBMCP SAFETY
+==================================================
+
+Read-only tools:
+
+- get_network_topology
+- get_device_config
+- get_interface_status
+- get_routing_table
+- get_arp_table
+- ping
+- trace_route
+- check_connectivity
+- get_network_issues
+
+Modification tools:
+
+- propose_configuration_change
+- apply_configuration_change
+
+CRITICAL:
+
+The AI should NOT silently modify the network.
+
+Modification flow:
+
+AI discovers issue
+↓
+AI explains evidence
+↓
+AI proposes fix
+↓
+Human approval
+↓
+Fix is applied
+↓
+Network is tested
+↓
+Result is displayed
+
+This human-in-the-loop behavior is a central feature of NetForge.
+
+==================================================
+AGENT WORKFLOW
+==================================================
+
+The ideal demo should work like this:
+
+USER:
+
+"PC-01 can't reach SRV-03. Find out why."
+
+AGENT:
+
+1. Calls get_network_topology
+2. Calls get_device_config
+3. Calls get_routing_table
+4. Calls check_connectivity
+5. Calls trace_route if necessary
+6. Determines root cause
+7. Explains the evidence
+8. Proposes a fix
+
+Example:
+
+"R-02 has no route to 10.1.20.0/24.
+The packet reaches R-02 but is dropped because no matching route exists."
+
+Then:
+
+"Recommended fix:
+Add a route to 10.1.20.0/24 via R-03."
+
+Display:
+
+[Approve Fix]
+[Reject]
+
+If approved:
+
+apply_configuration_change()
+
+Then:
+
+verify_fix()
+
+Finally:
+
+"Connectivity restored.
+PC-01 can now reach SRV-03."
+
+==================================================
+AGENT ACTION LOG
+==================================================
+
+Create a visible agent activity log.
+
+Example:
+
+10:31:04
+Agent started investigation
+
+10:31:05
+✓ Retrieved network topology
+
+10:31:06
+✓ Inspected R-02
+
+10:31:07
+✓ Retrieved routing table
+
+10:31:08
+⚠ Route to 10.1.20.0/24 missing
+
+10:31:09
+→ Proposed static route
+
+10:31:12
+👤 Human approved fix
+
+10:31:13
+✓ Configuration applied
+
+10:31:14
+✓ Connectivity verified
+
+This should make the WebMCP activity easy for competition judges to understand.
+
+==================================================
+PACKET VISUALIZATION
+==================================================
+
+When ping or traceroute is executed:
+
+Visually animate a packet traveling through the network topology.
+
+Example:
+
+PC-01
+  ↓
+SW-01
+  ↓
+R-01
+  ↓
+R-02
+  ↓
+SRV-03
+
+If it fails, show the point of failure visually.
+
+Example:
+
+PC-01
+  ↓
+SW-01
+  ↓
+R-01
+  ↓
+R-02
+  X
+No route
+
+Use animation sparingly and professionally.
+
+==================================================
+ISSUES PANEL
+==================================================
+
+Create an Issues page/panel.
+
+Each issue should contain:
+
+- Severity
+- Device
+- Description
+- Detected by
+- Evidence
+- Status
+
+Statuses:
+
+- Open
+- Investigating
+- Fix Proposed
+- Awaiting Approval
+- Resolved
+
+Example:
+
+CRITICAL
+
+R-02
+
+Missing route to 10.1.20.0/24
+
+Detected during connectivity test.
+
+==================================================
+LAB LIBRARY
+==================================================
+
+Create a simple Lab Library.
+
+Include:
+
+1. Missing Route
+2. Wrong Default Gateway
+3. Interface Down
+4. Incorrect IP Configuration
+5. Broken Link
+6. ARP Failure
+
+Each lab should have:
+
+- Title
+- Difficulty
+- Description
+- Number of issues
+- Start Lab button
+
+==================================================
+TRAFFIC VIEW
+==================================================
+
+Create a Traffic page showing simulated network traffic.
+
+Display:
+
+- Packets
+- Source
+- Destination
+- Protocol
+- Status
+- Path
+
+Example:
+
+ICMP
+PC-01 → SRV-03
+FAILED
+Reason: No route
+
+==================================================
+DASHBOARD
+==================================================
+
+Dashboard should show:
+
+- Devices
+- Links
+- Open Issues
+- Active Agents
+- Network Health
+- Recent Diagnostics
+- Recent Agent Actions
+
+Example:
+
+Devices: 12
+Links: 18
+Issues: 3
+Network Health: 75%
+Agent Status: Online
+
+==================================================
+TERMINAL
+==================================================
+
+Create a lightweight simulated terminal.
+
+Commands:
+
+ping <destination>
+traceroute <destination>
+show ip route
+show arp
+show interfaces
+show ip interface
+show devices
+
+These commands should query the same simulator state.
+
+Do NOT create a real shell.
+
+This is a safe simulated networking terminal.
+
+==================================================
+RESPONSIVE DESIGN
+==================================================
+
+Desktop is the primary target because this is a competition demonstration.
+
+However, ensure the UI does not completely break on smaller screens.
+
+Primary target:
+
+1440x900
+
+Also test:
+
+1920x1080
+1280x720
+
+==================================================
+ACCESSIBILITY
+==================================================
+
+Use:
+
+- Semantic HTML
+- Keyboard-accessible controls
+- Clear focus states
+- Good contrast
+- Tooltips where appropriate
+- aria-labels for icon-only buttons
+
+==================================================
+ERROR HANDLING
+==================================================
+
+Never allow a failed WebMCP/tool operation to crash the application.
+
+Every tool should return structured errors.
+
+Example:
+
+{
+  success: false,
+  error: "Device R-02 does not have interface G0/1"
+}
+
+Show useful error messages in the UI.
+
+==================================================
+IMPORTANT DEVELOPMENT RULES
+==================================================
+
+1. Build incrementally.
+
+2. First create the network simulator.
+
+3. Then create the topology visualization.
+
+4. Then implement diagnostics.
+
+5. Then implement failure injection.
+
+6. Then implement WebMCP tools.
+
+7. Then connect the agent workflow.
+
+8. Then build the human approval mechanism.
+
+9. Then polish the UI.
+
+Do NOT build everything as fake placeholder functionality.
+
+Every visible feature should either work or be clearly marked as not implemented.
+
+Do not create dozens of unnecessary pages.
+
+Prioritize the core demo.
+
+==================================================
+MVP ACCEPTANCE TEST
+==================================================
+
+The application is not considered complete until this exact scenario works:
+
+1. Start "Missing Route" lab.
+
+2. Network contains:
+PC-01
+SW-01
+R-01
+R-02
+R-03
+SRV-03
+
+3. PC-01 attempts to reach SRV-03.
+
+4. Ping fails.
+
+5. User asks NetOps Copilot:
+
+"Why can't PC-01 reach SRV-03?"
+
+6. Agent uses WebMCP tools to inspect the network.
+
+7. Agent identifies the missing route.
+
+8. Agent explains the evidence.
+
+9. Agent proposes a fix.
+
+10. User clicks Approve.
+
+11. Fix is applied to the simulator.
+
+12. Agent runs verification.
+
+13. Ping succeeds.
+
+14. Topology visually updates.
+
+15. Activity log shows the entire process.
+
+This should be the primary competition demo.
+
+==================================================
+COMPETITION DEMO EXPERIENCE
+==================================================
+
+The application should make it immediately obvious to a judge what is happening.
+
+The ideal demo:
+
+SCREEN:
+Broken network.
+
+USER:
+"NetOps Copilot, find out why PC-01 cannot reach the database server."
+
+AGENT:
+Inspects topology.
+
+AGENT:
+Checks routing.
+
+AGENT:
+Runs connectivity test.
+
+AGENT:
+Finds missing route.
+
+AGENT:
+Explains issue.
+
+AGENT:
+Proposes fix.
+
+USER:
+Approves.
+
+AGENT:
+Applies fix.
+
+AGENT:
+Verifies connectivity.
+
+SCREEN:
+Network changes from FAILED to HEALTHY.
+
+The entire process should take approximately 60-90 seconds in the demo.
+
+==================================================
+CODE QUALITY
+==================================================
+
+Use:
+
+- TypeScript strict mode
+- Reusable components
+- Clean interfaces/types
+- Small focused functions
+- No unnecessary dependencies
+- No duplicated business logic
+- No hardcoded agent-only logic
+- No fake tool execution
+- Comments only where they add value
+
+Network simulation logic must be independent from the React UI.
+
+WebMCP tools must call the network simulation layer rather than directly manipulating UI components.
+
+Architecture should be:
+
+WebMCP
+   ↓
+Network service layer
+   ↓
+Network state
+   ↓
+React UI
+
+NOT:
+
+WebMCP
+   ↓
+random UI state manipulation
+
+==================================================
+FINAL DELIVERABLES
+==================================================
+
+The finished repository should contain:
+
+- Working React application
+- TypeScript
+- Vite
+- Tailwind CSS
+- React Flow topology
+- Zustand state management
+- Functional network simulation
+- Functional diagnostics
+- Failure injection
+- NetOps Copilot interface
+- Real WebMCP tool integration
+- Human approval workflow
+- Agent activity log
+- Packet visualization
+- Multiple labs
+- README.md
+- Setup instructions
+- WebMCP explanation
+- Architecture explanation
+- Screenshots
+- Demo instructions
+
+README should explain:
+
+1. What NetForge is
+2. Why it exists
+3. How WebMCP is used
+4. Available WebMCP tools
+5. Network simulation architecture
+6. Human-in-the-loop safety
+7. How to run locally
+8. How to deploy
+9. How to reproduce the competition demo
+
+==================================================
+IMPLEMENTATION STRATEGY
+==================================================
+
+DO NOT immediately generate the entire project blindly.
+
+First:
+
+1. Inspect the existing repository.
+
+2. Determine whether a React/Vite project already exists.
+
+3. Preserve useful existing code.
+
+4. Create a detailed implementation plan.
+
+5. Identify dependencies that need installation.
+
+6. Implement the MVP in stages.
+
+After each major stage:
+
+- Run the application
+- Check for TypeScript errors
+- Check for build errors
+- Fix problems
+- Continue
+
+Start with:
+
+PHASE 1:
+Project setup and architecture.
+
+PHASE 2:
+Network data model and simulator.
+
+PHASE 3:
+React Flow topology.
+
+PHASE 4:
+Diagnostics.
+
+PHASE 5:
+Failure injection.
+
+PHASE 6:
+WebMCP tools.
+
+PHASE 7:
+NetOps Copilot workflow.
+
+PHASE 8:
+Human approval.
+
+PHASE 9:
+Packet animation and activity logs.
+
+PHASE 10:
+UI polish.
+
+PHASE 11:
+Testing.
+
+PHASE 12:
+README and deployment preparation.
+
+IMPORTANT FINAL INSTRUCTION:
+
+Do not simplify NetForge into a generic AI dashboard.
+
+The central differentiator is:
+
+"An AI agent can actually inspect, diagnose, propose changes to, and verify a live simulated network through WebMCP."
+
+Build around that concept.
