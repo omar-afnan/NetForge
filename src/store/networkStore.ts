@@ -8,13 +8,36 @@ import type {
   PacketTrace,
   ProposedFix,
 } from '@/network/types'
-import type { NetworkInterface } from '@/network/types'
+import type { NetworkInterface, StaticRoute } from '@/network/types'
 import { NetworkSimulator } from '@/network/simulator'
 import { starterLab, type LabDefinition } from '@/data/labs/starterLab'
 import { applyFailures, type FailureInjection } from '@/network/failures'
 import { isSameSubnet } from '@/network/ip'
 import { createDevice, nextHostname, planLink } from '@/network/builder'
 import { CABLE_PRESETS } from '@/network/cables'
+
+const STORAGE_KEY = 'netforge-network'
+
+function loadPersistedState(): Partial<NetworkState> | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw)
+    if (!data.devices || !data.links) return null
+    return data
+  } catch {
+    return null
+  }
+}
+
+function persistState(state: NetworkState) {
+  try {
+    const { simulator, ...rest } = state as any
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(rest))
+  } catch {
+    // ignore quota errors
+  }
+}
 
 interface LinkResult {
   ok: boolean
@@ -52,6 +75,11 @@ interface NetworkState {
   removeLink: (linkId: string) => void
   setLinkStatus: (linkId: string, status: 'up' | 'down') => void
   setLinkKind: (linkId: string, kind: CableKind) => void
+  addStaticRoute: (deviceId: string, route: StaticRoute) => void
+  removeStaticRoute: (
+    deviceId: string,
+    target: { destination: string; mask: string; nextHop?: string },
+  ) => void
   setPacketTrace: (trace: PacketTrace | null) => void
   clearPacketTrace: () => void
 }
@@ -84,7 +112,7 @@ function auditDeviceConfig(device: Device, devices: Device[]): NetworkIssue[] {
         description: `Default gateway ${gw} is outside every local subnet`,
         detectedBy: 'config-audit',
         evidence: device.interfaces
-          .map((iface) => `${iface.name}=${iface.ipAddress ?? '—'}/${iface.subnetMask ?? '—'}`)
+          .map((iface) => `${iface.name}=${iface.ipAddress ?? '-'}/${iface.subnetMask ?? '-'}`)
           .join(', '),
         status: 'open',
       })
@@ -211,35 +239,54 @@ function commit(devices: Device[], links: NetworkLink[]) {
   return { simulator, issues: deriveIssues(devices, links, simulator) }
 }
 
-export const useNetworkStore = create<NetworkState>((set, get) => ({
-  lab: starterLab,
-  baseline: { devices: starterLab.devices, links: starterLab.links },
-  devices: starterLab.devices,
-  links: starterLab.links,
-  issues: [],
-  failures: [],
-  proposedFixes: [],
-  selectedDeviceId: null,
-  selectedLinkId: null,
-  packetTrace: null,
-  simulator: createSimulator(starterLab.devices, starterLab.links),
+const persisted: any = loadPersistedState()
 
-  loadLab: (lab) => {
-    const baseline = { devices: lab.devices, links: lab.links }
-    const broken = applyFailures(baseline.devices, baseline.links, lab.failures ?? [])
-    set({
-      lab,
-      baseline,
-      devices: broken.devices,
-      links: broken.links,
-      failures: lab.failures ?? [],
-      proposedFixes: [],
-      selectedDeviceId: null,
-      selectedLinkId: null,
-      packetTrace: null,
-      ...commit(broken.devices, broken.links),
-    })
-  },
+export const useNetworkStore = create<NetworkState>((set, get) => {
+  const init = persisted
+    ? {
+        lab: persisted.lab ?? starterLab,
+        baseline: persisted.baseline ?? { devices: persisted.devices, links: persisted.links },
+        devices: persisted.devices,
+        links: persisted.links,
+        failures: persisted.failures ?? [],
+        proposedFixes: persisted.proposedFixes ?? [],
+        selectedDeviceId: persisted.selectedDeviceId ?? null,
+        selectedLinkId: persisted.selectedLinkId ?? null,
+        packetTrace: persisted.packetTrace ?? null,
+        ...commit(persisted.devices, persisted.links),
+      }
+    : {
+        lab: starterLab,
+        baseline: { devices: starterLab.devices, links: starterLab.links },
+        devices: starterLab.devices,
+        links: starterLab.links,
+        issues: [],
+        failures: [],
+        proposedFixes: [],
+        selectedDeviceId: null,
+        selectedLinkId: null,
+        packetTrace: null,
+        simulator: createSimulator(starterLab.devices, starterLab.links),
+      }
+
+  return {
+    ...init,
+    loadLab: (lab) => {
+      const baseline = { devices: lab.devices, links: lab.links }
+      const broken = applyFailures(baseline.devices, baseline.links, lab.failures ?? [])
+      set({
+        lab,
+        baseline,
+        devices: broken.devices,
+        links: broken.links,
+        failures: lab.failures ?? [],
+        proposedFixes: [],
+        selectedDeviceId: null,
+        selectedLinkId: null,
+        packetTrace: null,
+        ...commit(broken.devices, broken.links),
+      })
+    },
 
   // Discard every manual change and re-inject the lab's baseline faults.
   resetLab: () => get().loadLab(get().lab),
@@ -401,10 +448,43 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       return { links, ...commit(state.devices, links) }
     }),
 
+  addStaticRoute: (deviceId, route) =>
+    set((state) => {
+      const devices = state.devices.map((device) =>
+        device.id === deviceId
+          ? { ...device, staticRoutes: [...(device.staticRoutes ?? []), route] }
+          : device,
+      )
+      return { devices, ...commit(devices, state.links) }
+    }),
+
+  removeStaticRoute: (deviceId, target) =>
+    set((state) => {
+      const devices = state.devices.map((device) =>
+        device.id === deviceId
+          ? {
+              ...device,
+              staticRoutes: (device.staticRoutes ?? []).filter(
+                (route) =>
+                  !(
+                    route.destination === target.destination &&
+                    route.mask === target.mask &&
+                    (!target.nextHop || route.nextHop === target.nextHop)
+                  ),
+              ),
+            }
+          : device,
+      )
+      return { devices, ...commit(devices, state.links) }
+    }),
+
   setPacketTrace: (packetTrace) => set({ packetTrace }),
 
   clearPacketTrace: () => set({ packetTrace: null }),
-}))
+  }
+})
+
+useNetworkStore.subscribe(persistState)
 
 export function useSimulator() {
   return useNetworkStore((state) => state.simulator)

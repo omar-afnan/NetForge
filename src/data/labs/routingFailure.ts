@@ -17,7 +17,7 @@ export const routingFailureLab: LabDefinition = {
   title: 'The Missing Route',
   difficulty: 'intermediate',
   description:
-    'Workstations cannot reach any server in the 10.1.20.0/24 farm. The physical path is clean and every interface is up — walk the route tables on each hop of the transit path.',
+    'Workstations cannot reach any server in the 10.1.20.0/24 farm. The physical path is clean and every interface is up - walk the route tables on each hop of the transit path.',
   issueCount: 1,
   devices: baseline.devices,
   links: baseline.links,

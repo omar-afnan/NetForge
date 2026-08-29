@@ -8,6 +8,7 @@ import {
   Settings,
   Terminal,
 } from 'lucide-react'
+import { UserButton } from '@clerk/react'
 import { useNetworkStore } from '@/store/networkStore'
 import { useSettingsStore } from '@/store/settingsStore'
 import { useUIStore } from '@/store/uiStore'
@@ -80,6 +81,10 @@ export function Sidebar() {
           <span className="text-[var(--text-dim)]">Links</span>
           <span className="font-data text-right text-[var(--accent-link)]">{links.length}</span>
         </div>
+      </div>
+
+      <div className="border-t border-[var(--border)] p-3">
+        <UserButton />
       </div>
     </aside>
   )

@@ -17,7 +17,7 @@ export const interfaceFailureLab: LabDefinition = {
   title: 'Silent Interface',
   difficulty: 'beginner',
   description:
-    'Pings from the workstation LAN toward the server farm die in transit between the routers. Layer 2 to the workstations is healthy — check the state of every interface along the transit path.',
+    'Pings from the workstation LAN toward the server farm die in transit between the routers. Layer 2 to the workstations is healthy - check the state of every interface along the transit path.',
   issueCount: 1,
   devices: baseline.devices,
   links: baseline.links,

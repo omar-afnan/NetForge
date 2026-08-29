@@ -18,7 +18,7 @@ export const gatewayFailureLab: LabDefinition = {
   title: 'The Wrong Gateway',
   difficulty: 'beginner',
   description:
-    'Users on the workstation LAN can still reach each other, but one machine cannot get anywhere outside its own subnet. The switch and cabling check out — suspect a host configuration error.',
+    'Users on the workstation LAN can still reach each other, but one machine cannot get anywhere outside its own subnet. The switch and cabling check out - suspect a host configuration error.',
   issueCount: 1,
   devices: baseline.devices,
   links: baseline.links,

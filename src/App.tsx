@@ -1,16 +1,18 @@
-import { useEffect } from 'react'
 import { AlertTriangle, HardDrive, Link2, Network } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import { LabLibrary } from '@/components/labs/LabLibrary'
-import { DeviceInspector } from '@/components/devices/DeviceInspector'
+const RightDock = lazy(() => import('@/components/assistant/RightDock').then((m) => ({ default: m.RightDock })))
 import { DeviceTable } from '@/components/devices/DeviceTable'
-import { TopologyCanvas } from '@/components/topology/TopologyCanvas'
+const TopologyCanvas = lazy(() => import('@/components/topology/TopologyCanvas').then((m) => ({ default: m.TopologyCanvas })))
 import { TopologyToolbar } from '@/components/topology/TopologyToolbar'
-import { NetworkTerminal } from '@/components/terminal/NetworkTerminal'
+const NetworkTerminal = lazy(() => import('@/components/terminal/NetworkTerminal').then((m) => ({ default: m.NetworkTerminal })))
 import { SettingsView } from '@/components/settings/SettingsView'
+import { LandingPage } from '@/components/landing/LandingPage'
 import { useUIStore } from '@/store/uiStore'
 import { useNetworkStore } from '@/store/networkStore'
 import { useSettingsStore } from '@/store/settingsStore'
+import { useAuth } from '@clerk/react'
 
 function DashboardView() {
   const devices = useNetworkStore((s) => s.devices)
@@ -73,7 +75,9 @@ function TopologyView() {
       </div>
       <TopologyToolbar />
       <div className="min-h-0 flex-1">
-        <TopologyCanvas />
+        <Suspense fallback={null}>
+          <TopologyCanvas />
+        </Suspense>
       </div>
     </div>
   )
@@ -94,14 +98,41 @@ function PlaceholderView({ title, detail }: { title: string; detail: string }) {
 function App() {
   const activeView = useUIStore((s) => s.activeView)
   const glowEffects = useSettingsStore((s) => s.glowEffects)
+  const { isSignedIn } = useAuth()
 
   useEffect(() => {
     document.body.classList.toggle('glow-off', !glowEffects)
   }, [glowEffects])
 
+  // After signing in from the landing page, land on the dashboard — but only on the
+  // false→true transition, not on every activeView change (which would re-trigger on
+  // every sidebar click and trap the user on the dashboard).
+  const wasSignedIn = useRef(false)
+  useEffect(() => {
+    if (isSignedIn && !wasSignedIn.current) {
+      useUIStore.getState().setActiveView('dashboard')
+    }
+    wasSignedIn.current = isSignedIn ?? false
+  }, [isSignedIn])
+
+  // Avoid blocking the whole app while Clerk finishes initializing.
+  // Some environments (local/dev) may delay Clerk network calls; render the
+  // app UI and let Clerk-controlled components handle their own readiness.
+  if (!isSignedIn) {
+    return <LandingPage />
+  }
+
   let main: React.ReactNode
-  let bottom: React.ReactNode | undefined = <NetworkTerminal />
-  let right: React.ReactNode | undefined = <DeviceInspector />
+  let bottom: React.ReactNode | undefined = (
+    <Suspense fallback={null}>
+      <NetworkTerminal />
+    </Suspense>
+  )
+  let right: React.ReactNode | undefined = (
+    <Suspense fallback={null}>
+      <RightDock />
+    </Suspense>
+  )
 
   switch (activeView) {
     case 'dashboard':

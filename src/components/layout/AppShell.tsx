@@ -9,18 +9,22 @@ interface AppShellProps {
 
 export function AppShell({ children, rightPanel, bottomPanel }: AppShellProps) {
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex min-h-0 flex-1">
+    <div className="app-shell">
+      <div className="app-shell-body">
         <Sidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
-          {bottomPanel && (
-            <div className="panel h-48 shrink-0 border-t">{bottomPanel}</div>
-          )}
+        <div className="app-shell-content">
+          <div className={`netforge-layout${rightPanel ? ' with-diagnostics' : ''}`}>
+            <main className="topology-panel">
+              <div className="topology-column">
+                <div className="topology-view">{children}</div>
+                {bottomPanel && <div className="console-dock panel border-t">{bottomPanel}</div>}
+              </div>
+            </main>
+            {rightPanel && (
+              <aside className="diagnostics-panel panel border-l">{rightPanel}</aside>
+            )}
+          </div>
         </div>
-        {rightPanel && (
-          <aside className="panel w-72 shrink-0 border-l">{rightPanel}</aside>
-        )}
       </div>
       <StatusBar />
     </div>

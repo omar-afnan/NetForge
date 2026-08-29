@@ -48,16 +48,7 @@ interface Point {
   y: number
 }
 
-function nodeCenter(device: Device): Point {
-  return {
-    x: (device.position?.x ?? 0) + NODE_W / 2,
-    y: (device.position?.y ?? 0) + NODE_H / 2,
-  }
-}
-
-function connectionPoints(source: Device, target: Device) {
-  const s = nodeCenter(source)
-  const t = nodeCenter(target)
+function connectionPoints(s: Point, t: Point) {
   const dx = t.x - s.x
   const dy = t.y - s.y
 
@@ -134,15 +125,51 @@ export function TopologyCanvas() {
   const glowEffects = useSettingsStore((s) => s.glowEffects)
 
   const svgRef = useRef<SVGSVGElement | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
   const dragRef = useRef<{ deviceId: string; offset: Point; moved: boolean } | null>(null)
   const [wireSourceId, setWireSourceId] = useState<string | null>(null)
   const [wireCursor, setWireCursor] = useState<Point | null>(null)
   const [tracePos, setTracePos] = useState<Point | null>(null)
+  const [size, setSize] = useState<{ w: number; h: number }>({ w: CANVAS_W, h: CANVAS_H })
+
+  // Measure the canvas box so every coordinate is computed in real pixels —
+  // edges and nodes can then never extend beyond (or under) the diagnostics panel.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const update = () => setSize({ w: el.clientWidth || CANVAS_W, h: el.clientHeight || CANVAS_H })
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   const deviceMap = useMemo(() => new Map(devices.map((d) => [d.id, d])), [devices])
   const hostnameMap = useMemo(() => new Map(devices.map((d) => [d.hostname, d])), [devices])
 
   const wireSource = wireSourceId ? deviceMap.get(wireSourceId) : undefined
+
+  // Logical (1240x560) store positions mapped into the measured pixel box.
+  const sx = size.w / CANVAS_W
+  const sy = size.h / CANVAS_H
+
+  function nodePx(device: Device): Point {
+    const maxX = Math.max(0, size.w - NODE_W)
+    const maxY = Math.max(0, size.h - NODE_H)
+    return {
+      x: Math.min(Math.max((device.position?.x ?? 0) * sx, 0), maxX),
+      y: Math.min(Math.max((device.position?.y ?? 0) * sy, 0), maxY),
+    }
+  }
+
+  function nodePxCenter(device: Device): Point {
+    const p = nodePx(device)
+    return { x: p.x + NODE_W / 2, y: p.y + NODE_H / 2 }
+  }
+
+  function toLogical(point: Point): Point {
+    return { x: point.x / sx, y: point.y / sy }
+  }
 
   function toSvgPoint(event: React.PointerEvent): Point {
     const svg = svgRef.current
@@ -191,9 +218,10 @@ export function TopologyCanvas() {
     const points = packetTrace.path
       .map((hostname) => hostnameMap.get(hostname))
       .filter((device): device is Device => Boolean(device?.position))
-      .map(nodeCenter)
+      .map(nodePxCenter)
 
     if (points.length < 2) {
+      setTracePos(null)
       clearPacketTrace()
       return
     }
@@ -219,7 +247,7 @@ export function TopologyCanvas() {
       cleared = true
       cancelAnimationFrame(raf)
     }
-  }, [packetTrace, hostnameMap, clearPacketTrace])
+  }, [packetTrace, hostnameMap, clearPacketTrace, size.w, size.h])
 
   function handleNodePointerDown(event: React.PointerEvent, device: Device) {
     event.stopPropagation()
@@ -247,9 +275,10 @@ export function TopologyCanvas() {
     if (topologyTool !== 'select' || !device.position) return
 
     const point = toSvgPoint(event)
+    const origin = nodePx(device)
     dragRef.current = {
       deviceId: device.id,
-      offset: { x: point.x - device.position.x, y: point.y - device.position.y },
+      offset: { x: point.x - origin.x, y: point.y - origin.y },
       moved: false,
     }
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -259,7 +288,8 @@ export function TopologyCanvas() {
     const drag = dragRef.current
     if (!drag) return
     const point = toSvgPoint(event)
-    moveDevice(drag.deviceId, clampPosition({ x: point.x - drag.offset.x, y: point.y - drag.offset.y }))
+    const logical = toLogical({ x: point.x - drag.offset.x, y: point.y - drag.offset.y })
+    moveDevice(drag.deviceId, clampPosition(logical))
     drag.moved = true
   }
 
@@ -277,7 +307,8 @@ export function TopologyCanvas() {
     const point = toSvgPoint(event)
 
     if (topologyTool === 'place') {
-      addDevice(pendingDeviceType, clampPosition({ x: point.x - NODE_W / 2, y: point.y - NODE_H / 2 }))
+      const logical = toLogical(point)
+      addDevice(pendingDeviceType, clampPosition({ x: logical.x - NODE_W / 2, y: logical.y - NODE_H / 2 }))
       setTopologyNotice(`${pendingDeviceType.toUpperCase()} placed`)
       return
     }
@@ -302,11 +333,16 @@ export function TopologyCanvas() {
   const cursorClass = topologyTool === 'select' ? 'cursor-default' : 'cursor-crosshair'
 
   return (
-    <div className={`grid-bg relative h-full min-h-[420px] overflow-auto ${showGrid ? 'show-grid' : ''}`}>
+    <div
+      ref={containerRef}
+      className={`topology-canvas grid-bg relative h-full w-full overflow-hidden ${showGrid ? 'show-grid' : ''}`}
+    >
       <svg
         ref={svgRef}
-        className={`relative h-full min-h-[420px] w-full min-w-[1240px] ${cursorClass}`}
-        viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+        className={`absolute inset-0 h-full w-full ${cursorClass}`}
+        width={size.w}
+        height={size.h}
+        viewBox={`0 0 ${size.w} ${size.h}`}
         onPointerDown={handleBackgroundPointerDown}
         onPointerMove={handleSvgPointerMove}
       >
@@ -326,7 +362,7 @@ export function TopologyCanvas() {
           const up = link.status === 'up'
           const meta = cableMeta(link.kind)
           const selected = link.id === selectedLinkId
-          const { x1, y1, x2, y2 } = connectionPoints(source, target)
+          const { x1, y1, x2, y2 } = connectionPoints(nodePxCenter(source), nodePxCenter(target))
           const mx = (x1 + x2) / 2
           const my = (y1 + y2) / 2
           const flowStyle = {
@@ -425,8 +461,8 @@ export function TopologyCanvas() {
 
         {wireSource && wireCursor && (
           <line
-            x1={nodeCenter(wireSource).x}
-            y1={nodeCenter(wireSource).y}
+            x1={nodePxCenter(wireSource).x}
+            y1={nodePxCenter(wireSource).y}
             x2={wireCursor.x}
             y2={wireCursor.y}
             stroke={cableMeta(wireKind).color}
@@ -446,7 +482,7 @@ export function TopologyCanvas() {
           return (
             <g
               key={device.id}
-              transform={`translate(${device.position.x}, ${device.position.y})`}
+              transform={`translate(${nodePx(device).x}, ${nodePx(device).y})`}
               filter={selected && glowEffects ? 'url(#selected-glow)' : 'url(#node-glow)'}
               style={{ cursor: topologyTool === 'select' ? 'grab' : 'crosshair' }}
               onPointerDown={(event) => handleNodePointerDown(event, device)}
