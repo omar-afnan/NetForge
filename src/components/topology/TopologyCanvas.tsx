@@ -105,6 +105,7 @@ export function TopologyCanvas() {
   const selectedDeviceId = useNetworkStore((s) => s.selectedDeviceId)
   const selectedLinkId = useNetworkStore((s) => s.selectedLinkId)
   const packetTrace = useNetworkStore((s) => s.packetTrace)
+  const highlightedDeviceId = useNetworkStore((s) => s.highlightedDeviceId)
   const selectDevice = useNetworkStore((s) => s.selectDevice)
   const selectLink = useNetworkStore((s) => s.selectLink)
   const addDevice = useNetworkStore((s) => s.addDevice)
@@ -478,6 +479,7 @@ export function TopologyCanvas() {
           const color = typeColors[device.type]
           const failed = device.status !== 'healthy'
           const wirePicked = wireSourceId === device.id
+          const aiHighlighted = device.id === highlightedDeviceId
 
           return (
             <g
@@ -515,6 +517,19 @@ export function TopologyCanvas() {
                   fill="none"
                   stroke={cableMeta(wireKind).color}
                   strokeDasharray="5 4"
+                />
+              )}
+              {aiHighlighted && (
+                <rect
+                  x={-6}
+                  y={-6}
+                  width={NODE_W + 12}
+                  height={NODE_H + 12}
+                  fill="none"
+                  stroke="#f0b429"
+                  strokeWidth={2}
+                  strokeDasharray="6 4"
+                  className="ai-highlight-ring"
                 />
               )}
             </g>

@@ -2,7 +2,7 @@ import { AlertTriangle, HardDrive, Link2, Network } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { lazy, Suspense, useEffect, useRef } from 'react'
 import { LabLibrary } from '@/components/labs/LabLibrary'
-const RightDock = lazy(() => import('@/components/assistant/RightDock').then((m) => ({ default: m.RightDock })))
+const RightSidebar = lazy(() => import('@/components/assistant/RightSidebar').then((m) => ({ default: m.RightSidebar })))
 import { DeviceTable } from '@/components/devices/DeviceTable'
 const TopologyCanvas = lazy(() => import('@/components/topology/TopologyCanvas').then((m) => ({ default: m.TopologyCanvas })))
 import { TopologyToolbar } from '@/components/topology/TopologyToolbar'
@@ -130,7 +130,7 @@ function App() {
   )
   let right: React.ReactNode | undefined = (
     <Suspense fallback={null}>
-      <RightDock />
+      <RightSidebar />
     </Suspense>
   )
 

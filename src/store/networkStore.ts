@@ -17,6 +17,7 @@ import { createDevice, nextHostname, planLink } from '@/network/builder'
 import { CABLE_PRESETS } from '@/network/cables'
 
 const STORAGE_KEY = 'netforge-network'
+const LAB_PROGRESS_KEY = 'netforge-lab-progress'
 
 function loadPersistedState(): Partial<NetworkState> | null {
   try {
@@ -27,6 +28,24 @@ function loadPersistedState(): Partial<NetworkState> | null {
     return data
   } catch {
     return null
+  }
+}
+
+function loadLabProgress(): Record<string, { completed: boolean; completedAt: string; attempts: number; hintsUsed: number; aiAssisted: boolean }> {
+  try {
+    const raw = localStorage.getItem(LAB_PROGRESS_KEY)
+    if (!raw) return {}
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}
+
+function persistLabProgress(progress: Record<string, { completed: boolean; completedAt: string; attempts: number; hintsUsed: number; aiAssisted: boolean }>) {
+  try {
+    localStorage.setItem(LAB_PROGRESS_KEY, JSON.stringify(progress))
+  } catch {
+    // ignore quota errors
   }
 }
 
@@ -54,6 +73,8 @@ interface NetworkState {
   selectedDeviceId: string | null
   selectedLinkId: string | null
   packetTrace: PacketTrace | null
+  highlightedDeviceId: string | null
+  completedLabs: Record<string, { completed: boolean; completedAt: string; attempts: number; hintsUsed: number; aiAssisted: boolean }>
   simulator: NetworkSimulator
   baseline: { devices: Device[]; links: NetworkLink[] }
   loadLab: (lab: LabDefinition) => void
@@ -82,6 +103,9 @@ interface NetworkState {
   ) => void
   setPacketTrace: (trace: PacketTrace | null) => void
   clearPacketTrace: () => void
+  setHighlightedDevice: (deviceId: string | null) => void
+  completeLab: (labId: string, aiAssisted: boolean) => void
+  resetLabProgress: (labId: string) => void
 }
 
 function createSimulator(devices: Device[], links: NetworkLink[]) {
@@ -240,6 +264,7 @@ function commit(devices: Device[], links: NetworkLink[]) {
 }
 
 const persisted: any = loadPersistedState()
+const labProgress = loadLabProgress()
 
 export const useNetworkStore = create<NetworkState>((set, get) => {
   const init = persisted
@@ -253,6 +278,8 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
         selectedDeviceId: persisted.selectedDeviceId ?? null,
         selectedLinkId: persisted.selectedLinkId ?? null,
         packetTrace: persisted.packetTrace ?? null,
+        highlightedDeviceId: null,
+        completedLabs: labProgress,
         ...commit(persisted.devices, persisted.links),
       }
     : {
@@ -266,6 +293,8 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
         selectedDeviceId: null,
         selectedLinkId: null,
         packetTrace: null,
+        highlightedDeviceId: null,
+        completedLabs: labProgress,
         simulator: createSimulator(starterLab.devices, starterLab.links),
       }
 
@@ -481,6 +510,25 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
   setPacketTrace: (packetTrace) => set({ packetTrace }),
 
   clearPacketTrace: () => set({ packetTrace: null }),
+  setHighlightedDevice: (deviceId) => set({ highlightedDeviceId: deviceId }),
+  completeLab: (labId, aiAssisted) => {
+    const progress = { ...get().completedLabs }
+    progress[labId] = {
+      completed: true,
+      completedAt: new Date().toISOString(),
+      attempts: (progress[labId]?.attempts ?? 0) + 1,
+      hintsUsed: progress[labId]?.hintsUsed ?? 0,
+      aiAssisted,
+    }
+    set({ completedLabs: progress })
+    persistLabProgress(progress)
+  },
+  resetLabProgress: (labId) => {
+    const progress = { ...get().completedLabs }
+    delete progress[labId]
+    set({ completedLabs: progress })
+    persistLabProgress(progress)
+  },
   }
 })
 

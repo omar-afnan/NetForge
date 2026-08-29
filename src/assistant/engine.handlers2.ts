@@ -6,7 +6,9 @@ import { diagnosePing, scanLab, formatMatrix } from './diagnose'
 import { text, buildPlan, planMessage, proposeOrApply } from './engine.core'
 import { lookupKnowledge } from './knowledge'
 import { useCopilotStore } from '@/store/copilotStore'
+import { useNetworkStore } from '@/store/networkStore'
 import type { Device } from '@/network/types'
+import { runLabAssist } from './labAssist'
 
 export function handlePing(cmd: ParsedCommand): AssistantMessage[] {
   const source = resolveDevice(cmd.deviceRef) ?? getSelectedDevice() ?? undefined
@@ -53,6 +55,13 @@ export function handleTests(): AssistantMessage[] {
 }
 
 export function handleCompleteLab(): AssistantMessage[] {
+  const netStore = useNetworkStore.getState()
+  const labId = netStore.lab.id
+  if (labId && labId !== 'starter') {
+    useCopilotStore.getState().setMode('takeover')
+    window.setTimeout(() => runLabAssist(labId), 0)
+    return [text(`Starting Lab Assist Mode for ${netStore.lab.title}. I'll investigate step by step and explain everything.`)]
+  }
   const { problems, plan, matrix } = scanLab()
   if (plan.length === 0) return [text(problems.length === 0 ? `All ${matrix.length} tests already pass. 🎉` : `Issues found, none I can safely automate:\n${problems.map((p) => `• ${p.summary}`).join('\n')}`)]
   const labPlan = buildPlan('Complete the lab', problems.slice(0, 6).map((p) => p.summary), plan)

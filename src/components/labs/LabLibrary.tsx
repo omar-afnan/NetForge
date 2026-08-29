@@ -1,4 +1,4 @@
-import { FlaskConical, Play } from 'lucide-react'
+import { FlaskConical, Play, CheckCircle2 } from 'lucide-react'
 import { ALL_LABS } from '@/data/labs'
 import { useNetworkStore } from '@/store/networkStore'
 import { useUIStore } from '@/store/uiStore'
@@ -7,6 +7,7 @@ const labs = ALL_LABS
 
 export function LabLibrary() {
   const activeLabId = useNetworkStore((s) => s.lab.id)
+  const completedLabs = useNetworkStore((s) => s.completedLabs)
   const loadLab = useNetworkStore((s) => s.loadLab)
   const setActiveView = useUIStore((s) => s.setActiveView)
 
@@ -25,6 +26,7 @@ export function LabLibrary() {
         <div className="grid grid-cols-2 gap-3">
           {labs.map((lab) => {
             const active = lab.id === activeLabId
+            const progress = completedLabs[lab.id]
             return (
               <div
                 key={lab.id}
@@ -34,7 +36,11 @@ export function LabLibrary() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <FlaskConical className="h-3.5 w-3.5 text-[var(--accent-link)]" strokeWidth={1.75} />
+                    {progress?.completed ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-[var(--status-up)]" strokeWidth={1.75} />
+                    ) : (
+                      <FlaskConical className="h-3.5 w-3.5 text-[var(--accent-link)]" strokeWidth={1.75} />
+                    )}
                     <span className="text-[13px] font-semibold text-[var(--text-primary)]">{lab.title}</span>
                   </div>
                   <span className={`badge difficulty-${lab.difficulty}`}>{lab.difficulty}</span>
@@ -43,6 +49,13 @@ export function LabLibrary() {
                 <div className="mt-1 font-data text-[10px] text-[var(--text-dim)]">
                   {lab.id} · {lab.issueCount} injected {lab.issueCount === 1 ? 'fault' : 'faults'}
                 </div>
+
+                {progress?.completed && (
+                  <div className="mt-1 font-data text-[10px] text-[var(--status-up)]">
+                    ✓ Completed {progress.completedAt ? new Date(progress.completedAt).toLocaleDateString() : ''}
+                    {progress.aiAssisted ? ' · AI assisted' : ''}
+                  </div>
+                )}
 
                 <p className="mt-2 flex-1 text-[11px] leading-relaxed text-[var(--text-secondary)]">
                   {lab.description}
