@@ -223,10 +223,22 @@ export function TopologyCanvas() {
       return
     }
 
-    const points = packetTrace.path
+    // Ride the ACTUAL cables: build the polyline from the same connection
+    // points the canvas uses to draw each link, node-center to node-center,
+    // so the dot follows the lines instead of cutting straight chords.
+    const hopCenters = packetTrace.path
       .map((hostname) => hostnameMap.get(hostname))
       .filter((device): device is Device => Boolean(device?.position))
       .map(nodePxCenter)
+
+    const points: Point[] = []
+    if (hopCenters.length >= 2) {
+      points.push(hopCenters[0])
+      for (let i = 1; i < hopCenters.length; i += 1) {
+        const { x1, y1, x2, y2 } = connectionPoints(hopCenters[i - 1], hopCenters[i])
+        points.push({ x: x1, y: y1 }, { x: x2, y: y2 }, hopCenters[i])
+      }
+    }
 
     if (points.length < 2) {
       setTracePos(null)

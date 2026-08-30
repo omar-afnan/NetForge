@@ -323,9 +323,12 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
         selectedDeviceId: null,
         selectedLinkId: null,
         packetTrace: null,
+        packets: [], // live session log — never carry packets between labs
         ...commit(broken.devices, broken.links),
       })
-      useCopilotStore.getState().switchLab(lab.id)
+      useNetworkStore.setState({ highlightedDeviceId: null })
+      // Fresh session for the newly loaded lab (fresh chat, no takeover/plan).
+      useCopilotStore.getState().switchLab(lab.id, { fresh: true })
     },
 
   // Discard every manual change and re-inject the lab's baseline faults.

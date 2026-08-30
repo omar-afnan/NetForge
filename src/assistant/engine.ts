@@ -75,13 +75,19 @@ export function handleMessage(raw: string): void {
   const store = useCopilotStore.getState()
   store.pushMessage({ id: newId(), role: 'user', kind: 'text', text: trimmed })
   store.setStatus('thinking')
+  const labAtSend = store.activeLabId
   window.setTimeout(() => {
+    // If the lab changed in the meantime, drop the response — never leak a
+    // reply into another lab's conversation.
+    if (useCopilotStore.getState().activeLabId !== labAtSend) return
     try {
       for (const reply of respond(trimmed)) useCopilotStore.getState().pushMessage(reply)
     } catch (error) {
       useCopilotStore.getState().pushMessage(text(`[FAIL] ${error instanceof Error ? error.message : String(error)}\nNo configuration changes were made.`))
     } finally {
-      useCopilotStore.getState().setStatus('idle')
+      const s = useCopilotStore.getState()
+      // Don't clobber the takeover's "working" status when a chat answer finishes.
+      s.setStatus(s.labAssist.busy ? 'working' : 'idle')
     }
   }, 350)
 }

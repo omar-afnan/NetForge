@@ -28,6 +28,8 @@ export interface PingTest {
   source: string
   destination: string
   success: boolean
+  /** Hostnames along the simulated path (source → … → final hop). */
+  hops?: string[]
   detail: string
 }
 

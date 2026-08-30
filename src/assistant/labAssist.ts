@@ -2,7 +2,7 @@ import type { AssistStep } from '@/store/copilotStore'
 import { useCopilotStore } from '@/store/copilotStore'
 import { useNetworkStore } from '@/store/networkStore'
 import { useUIStore } from '@/store/uiStore'
-import { runConnectivityMatrix } from './tools'
+import { ping, runConnectivityMatrix } from './tools'
 import { scanLab, formatMatrix } from './diagnose'
 import { executeChange } from './engine.core'
 
@@ -10,6 +10,49 @@ import type { ProposedChange } from './types'
 
 function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms))
+}
+
+/** Sentinel thrown when the takeover run becomes stale (lab switched/exited). */
+const STALE = Symbol('lab-assist-stale')
+
+/**
+ * Abort the takeover the moment the active lab changes or the user exits
+ * assist mode. Prevents stale async runs from mutating or completing a lab
+ * that is no longer on screen.
+ */
+function makeStaleGuard(labId: string, startEpoch: number) {
+  return () => {
+    const s = useCopilotStore.getState()
+    return (
+      s.assistEpoch !== startEpoch ||
+      s.labAssist.labId !== labId ||
+      useNetworkStore.getState().lab.id !== labId
+    )
+  }
+}
+
+async function pause(ms: number, isStale: () => boolean) {
+  await delay(ms)
+  if (isStale()) throw STALE
+}
+
+/**
+ * Run a REAL ping and animate the packet along the simulator's actual path on
+ * the topology canvas (via the existing packetTrace system). Everything shown
+ * is driven by live network state — nothing is prerecorded.
+ */
+async function animateTest(
+  sourceRef: string,
+  destinationRef: string,
+  isStale: () => boolean,
+): Promise<{ ok: boolean; detail: string }> {
+  const result = ping(sourceRef, destinationRef)
+  if (!result.ok || !result.data) return { ok: false, detail: result.error ?? 'Ping failed.' }
+  const { hops, success, detail } = result.data
+  useNetworkStore.getState().setPacketTrace({ id: crypto.randomUUID(), path: hops ?? [], success })
+  // Match the canvas animation length (600 + hops*220 ms) plus its clear delay.
+  await pause(700 + (hops?.length ?? 2) * 220 + 450, isStale)
+  return { ok: success, detail }
 }
 
 function setSteps(steps: AssistStep[]) {
@@ -64,8 +107,15 @@ function commandEcho(change: ProposedChange): string {
  */
 export async function runLabAssist(labId: string) {
   const store = useCopilotStore.getState()
+
+  // Never allow two takeover drivers to interleave on the same lab.
+  if (store.labAssist.busy) return
+
   const net = useNetworkStore.getState()
   const lab = net.lab
+  const isStale = makeStaleGuard(labId, store.assistEpoch)
+  // All waits below abort the run the moment the lab changes or assist is exited.
+  const delay = async (ms: number) => pause(ms, isStale)
 
   // Nothing broken yet.
   const line = (text: string, tone: 'info' | 'ok' | 'warn' | 'cmd' | 'header' = 'info') =>
@@ -127,6 +177,7 @@ export async function runLabAssist(labId: string) {
   ]
 
   store.startLabAssist(labId, steps)
+  store.setTakeoverPhase('working') // make the live takeover overlay visible
   store.setStatus('working')
 
   const advance = (idx: number, status: 'active' | 'done') =>
@@ -148,6 +199,37 @@ export async function runLabAssist(labId: string) {
     await delay(900)
     line('✓ Topology identified', 'ok')
     await delay(500)
+
+    // ---- Live inspection on the REAL topology: highlight each affected host,
+    // narrate its config vs the on-link router, and animate a FAILING ping
+    // along the simulator's actual path. All driven by live state. ----
+    const seenSources = new Set<string>()
+    for (const failure of matrix.filter((t) => !t.success)) {
+      if (seenSources.has(failure.source)) continue
+      seenSources.add(failure.source)
+      const device = net.devices.find((d) => d.hostname === failure.source)
+      if (!device) continue
+      net.setHighlightedDevice(device.id)
+      line(`Inspecting ${failure.source} configuration...`, 'info')
+      await delay(700)
+      const gwFix = plan.find((c) => c.kind === 'gateway' && c.deviceRef === failure.source)
+      const correctGw = gwFix ? (gwFix.payload as { gateway?: string }).gateway : undefined
+      if (correctGw) {
+        line(`${failure.source} configured gateway: ${device.defaultGateway ?? '(none)'}`, 'cmd')
+        await delay(550)
+        line(`Router on ${failure.source}'s subnet: ${correctGw}`, 'cmd')
+        await delay(550)
+        line(`⚠ Gateway mismatch detected on ${failure.source}`, 'warn')
+        await delay(450)
+      }
+      const destIp = /\((\d{1,3}(?:\.\d{1,3}){3})\)/.exec(failure.destination)?.[1] ?? failure.destination
+      line(`Testing ${failure.source} → ${destIp}...`, 'info')
+      await delay(300)
+      const test = await animateTest(failure.source, destIp, isStale)
+      line(test.ok ? '✓ Connection successful' : `✗ ${test.detail}`, test.ok ? 'ok' : 'warn')
+      await delay(400)
+    }
+    net.setHighlightedDevice(null)
 
     const applied: ProposedChange[] = []
     let matrixAfter = matrix
@@ -179,6 +261,11 @@ export async function runLabAssist(labId: string) {
         if (change.deviceRef) net.setHighlightedDevice(change.deviceRef)
         line(commandEcho(change), 'cmd')
         await delay(700)
+        // Narrate the concrete configuration change (e.g. gateway OLD → NEW).
+        if (change.kind === 'gateway') {
+          const before = net.devices.find((d) => d.hostname === host)?.defaultGateway
+          line(`${host} gateway: ${before ?? '(none)'} → ${(change.payload as { gateway?: string }).gateway}`, 'warn')
+        }
         line(`${change.detail ?? 'Applying configuration'}...`, 'info')
         await delay(500)
 
@@ -214,11 +301,17 @@ export async function runLabAssist(labId: string) {
 
     if (success) {
       markAllDone()
-      for (const t of matrixAfter.slice(0, 4)) {
+      // Verification packets travel the REAL topology along the simulator's path.
+      for (const t of matrixAfter.slice(0, 3)) {
+        const src = net.devices.find((d) => d.hostname === t.source)
+        if (src) net.setHighlightedDevice(src.id)
         line(`> ping ${t.destination ?? ''}`, 'cmd')
-        await delay(450)
-        line(t.success ? '✓ Connection successful' : '✗ No response', t.success ? 'ok' : 'warn')
-        await delay(300)
+        await delay(250)
+        const destIp = /\((\d{1,3}(?:\.\d{1,3}){3})\)/.exec(t.destination)?.[1] ?? t.destination
+        const test = await animateTest(t.source, destIp, isStale)
+        line(test.ok ? '✓ Connection successful' : `✗ ${test.detail}`, test.ok ? 'ok' : 'warn')
+        net.setHighlightedDevice(null)
+        await delay(250)
       }
       if (matrixAfter.length > 4) {
         line(`✓ ${matrixAfter.length} connectivity tests passing`, 'ok')
@@ -266,10 +359,14 @@ export async function runLabAssist(labId: string) {
       )
     }
   } catch (error) {
+    // Stale run (lab switched / assist exited) — silently abort, never touch
+    // the state of whatever lab is active now.
+    if (error === STALE) return
     store.setTakeoverPhase('idle')
     store.stopLabAssist()
     push(`[ERROR] ${error instanceof Error ? error.message : 'Unknown error'}`)
   } finally {
+    if (isStale()) return
     store.setStatus('idle')
     store.setLabAssistBusy(false)
     net.setHighlightedDevice(null)

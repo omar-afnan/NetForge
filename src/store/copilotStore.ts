@@ -69,13 +69,19 @@ interface CopilotState {
   labAssist: LabAssistState
   activeLabId: string | null
   labConversations: Record<string, AssistantMessage[]>
+  /**
+   * Bumped every time the active lab changes. Long-running async drivers
+   * (AI takeover) capture it at start and abort when it changes, so a stale
+   * run can never mutate or complete a different lab.
+   */
+  assistEpoch: number
   addAction: (action: AgentAction) => void
   clearActions: () => void
   pushMessage: (message: AssistantMessage) => void
   setMode: (mode: AssistantMode) => void
   setStatus: (status: AssistantStatus) => void
   setPendingPlan: (pendingPlan: LabPlan | null) => void
-  switchLab: (labId: string) => void
+  switchLab: (labId: string, options?: { fresh?: boolean }) => void
   startLabAssist: (labId: string, steps: AssistStep[]) => void
   advanceLabAssist: () => void
   setLabAssistHighlight: (deviceId: string | null) => void
@@ -97,6 +103,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
   labAssist: DEFAULT_ASSIST,
   activeLabId: null,
   labConversations: {},
+  assistEpoch: 0,
   addAction: (action) => set((state) => ({ actions: [...state.actions, action] })),
   clearActions: () => set({ actions: [] }),
   pushMessage: (message) => set((state) => {
@@ -110,10 +117,12 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
   setMode: (mode) => set({ mode }),
   setStatus: (status) => set({ status }),
   setPendingPlan: (pendingPlan) => set({ pendingPlan }),
-  switchLab: (labId) => {
+  switchLab: (labId, options) => {
     const state = get()
     const conversations = { ...state.labConversations }
-    if (!conversations[labId]) {
+    // A lab load always starts a fresh conversation for that lab — never
+    // restore messages from a previous run or from another lab.
+    if (options?.fresh || !conversations[labId]) {
       conversations[labId] = [GREETING]
     }
     set({
@@ -124,6 +133,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
       pendingPlan: null,
       status: 'idle',
       mode: 'learning',
+      assistEpoch: state.assistEpoch + 1,
     })
   },
   startLabAssist: (labId, steps) => set({ labAssist: { ...DEFAULT_ASSIST, enabled: true, labId, steps, currentStepIndex: 0, busy: true } }),

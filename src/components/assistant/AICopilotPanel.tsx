@@ -22,7 +22,6 @@ export function AICopilotPanel() {
   const labAssist = useCopilotStore((s) => s.labAssist)
   const setMode = useCopilotStore((s) => s.setMode)
   const clearChat = useCopilotStore((s) => s.clearChat)
-  const startLabAssist = useCopilotStore((s) => s.startLabAssist)
   const stopLabAssist = useCopilotStore((s) => s.stopLabAssist)
 
   const selectedDeviceId = useNetworkStore((s) => s.selectedDeviceId)
@@ -44,12 +43,17 @@ export function AICopilotPanel() {
 
   const send = (raw: string) => {
     const value = raw.trim()
-    if (!value || status !== 'idle') return
+    // Only block while a chat answer is being composed — the AI takeover must
+    // NOT lock the chat: the user can ask questions while it works.
+    if (!value || status === 'thinking') return
     handleMessage(value)
     setInput('')
   }
 
   const busy = status !== 'idle' || labAssist.busy
+  // Chat-level busy: takeover keeps status at 'working' for its whole run, but
+  // that must not count as "the assistant can't answer right now".
+  const chatBusy = status === 'thinking' || (status === 'working' && !labAssist.busy)
 
   return (
     <div className="ai-copilot-panel">
@@ -159,7 +163,8 @@ export function AICopilotPanel() {
             onClick={() => {
               if (lab.id && lab.id !== 'starter') {
                 setMode('takeover')
-                startLabAssist(lab.id, [])
+                // The driver owns the assist state (steps, busy flag) —
+                // don't pre-start it here or the busy guard blocks the run.
                 window.setTimeout(() => runLabAssist(lab.id), 0)
               }
             }}
@@ -234,7 +239,7 @@ export function AICopilotPanel() {
 
       <div className="ai-copilot-suggestions">
         {SUGGESTIONS.map((suggestion) => (
-          <button key={suggestion} type="button" disabled={busy} onClick={() => send(suggestion)}>
+          <button key={suggestion} type="button" disabled={chatBusy} onClick={() => send(suggestion)}>
             {suggestion}
           </button>
         ))}
@@ -250,11 +255,11 @@ export function AICopilotPanel() {
         <input
           value={input}
           onChange={(event) => setInput(event.target.value)}
-          placeholder="Ask anything about your network..."
-          disabled={busy}
+          placeholder={labAssist.enabled ? 'Ask the AI what it is doing...' : 'Ask anything about your network...'}
+          disabled={chatBusy}
           aria-label="Ask anything about your network"
         />
-        <button type="submit" disabled={busy || !input.trim()} aria-label="Send">
+        <button type="submit" disabled={chatBusy || !input.trim()} aria-label="Send">
           <SendHorizonal className="h-4 w-4" strokeWidth={1.75} />
         </button>
       </form>

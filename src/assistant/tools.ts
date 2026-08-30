@@ -72,6 +72,7 @@ export function ping(sourceRef: string, destinationRef: string): ToolResult<Ping
       source: source.hostname,
       destination: destinationIp,
       success: result.success,
+      hops: result.hops,
       detail: result.success
         ? `${result.latencyMs}ms via ${result.hops.join(' → ')}`
         : (result.failureReason ?? 'Ping failed.'),
