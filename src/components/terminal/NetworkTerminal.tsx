@@ -22,6 +22,7 @@ export function NetworkTerminal() {
   const useSelected = useSettingsStore((s) => s.useSelectedDeviceForTerminal)
   const defaultDevice = useSettingsStore((s) => s.defaultTerminalDevice)
   const setPacketTrace = useNetworkStore((s) => s.setPacketTrace)
+  const logPacket = useNetworkStore((s) => s.logPacket)
 
   const selectedHost = selectedDeviceId
     ? getDeviceById(devices, selectedDeviceId)?.hostname
@@ -54,6 +55,14 @@ export function NetworkTerminal() {
           break
         }
         const result = simulator.ping(contextHost, dest)
+        logPacket({
+          source: contextHost,
+          destination: result.destination,
+          protocol: 'ICMP',
+          path: result.hops,
+          status: result.success ? 'success' : 'failed',
+          failureReason: result.success ? undefined : result.failureReason,
+        })
         setPacketTrace({ id: crypto.randomUUID(), path: result.hops, success: result.success })
         if (result.success) {
           append('output', `Reply from ${result.destination}: time=${result.latencyMs}ms`)
@@ -71,10 +80,20 @@ export function NetworkTerminal() {
           break
         }
         const hops = simulator.traceRoute(contextHost, dest)
+        const hopsForwarded = hops.filter((hop) => hop.status === 'forwarded').map((hop) => hop.device)
+        const hopsSuccess = hops.every((hop) => hop.status === 'forwarded')
+        logPacket({
+          source: contextHost,
+          destination: dest,
+          protocol: 'ICMP',
+          path: hopsForwarded,
+          status: hopsSuccess ? 'success' : 'failed',
+          failureReason: hopsSuccess ? undefined : hops.find((hop) => hop.status === 'failed')?.failureReason,
+        })
         setPacketTrace({
           id: crypto.randomUUID(),
-          path: hops.filter((hop) => hop.status === 'forwarded').map((hop) => hop.device),
-          success: hops.every((hop) => hop.status === 'forwarded'),
+          path: hopsForwarded,
+          success: hopsSuccess,
         })
         hops.forEach((hop) => {
           if (hop.status === 'failed') {

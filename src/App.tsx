@@ -2,6 +2,8 @@ import { AlertTriangle, HardDrive, Link2, Network } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { lazy, Suspense, useEffect, useRef } from 'react'
 import { LabLibrary } from '@/components/labs/LabLibrary'
+import { IssueTracker } from '@/components/issues/IssueTracker'
+import { TrafficMonitor } from '@/components/traffic/TrafficMonitor'
 const RightSidebar = lazy(() => import('@/components/assistant/RightSidebar').then((m) => ({ default: m.RightSidebar })))
 import { DeviceTable } from '@/components/devices/DeviceTable'
 const TopologyCanvas = lazy(() => import('@/components/topology/TopologyCanvas').then((m) => ({ default: m.TopologyCanvas })))
@@ -9,6 +11,7 @@ import { TopologyToolbar } from '@/components/topology/TopologyToolbar'
 const NetworkTerminal = lazy(() => import('@/components/terminal/NetworkTerminal').then((m) => ({ default: m.NetworkTerminal })))
 import { SettingsView } from '@/components/settings/SettingsView'
 import { LandingPage } from '@/components/landing/LandingPage'
+import { TakeoverOverlay } from '@/components/assistant/TakeoverOverlay'
 import { useUIStore } from '@/store/uiStore'
 import { useNetworkStore } from '@/store/networkStore'
 import { useSettingsStore } from '@/store/settingsStore'
@@ -66,7 +69,7 @@ function DashboardView() {
 
 function TopologyView() {
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="relative flex h-full flex-col overflow-hidden">
       <div className="panel-header flex items-center justify-between">
         <span>Network Topology</span>
         <span className="badge badge-cyan font-data text-[9px] normal-case tracking-normal">
@@ -79,18 +82,8 @@ function TopologyView() {
           <TopologyCanvas />
         </Suspense>
       </div>
-    </div>
-  )
-}
-
-function PlaceholderView({ title, detail }: { title: string; detail: string }) {
-  return (
-    <div className="flex h-full flex-col">
-      <div className="panel-header">{title}</div>
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
-        <div className="text-[11px] uppercase tracking-widest text-[var(--text-dim)]">Coming soon</div>
-        <p className="max-w-sm text-[12px] text-[var(--text-secondary)]">{detail}</p>
-      </div>
+      {/* Live AI takeover overlay — docked over the real topology canvas. */}
+      <TakeoverOverlay />
     </div>
   )
 }
@@ -147,10 +140,10 @@ function App() {
       right = undefined
       break
     case 'traffic':
-      main = <PlaceholderView title="Traffic Monitor" detail="Packet flow logging arrives in a later phase." />
+      main = <TrafficMonitor />
       break
     case 'issues':
-      main = <PlaceholderView title="Issue Tracker" detail="Failure injection and issue detection arrive in Phase 5." />
+      main = <IssueTracker />
       break
     case 'labs':
       main = <LabLibrary />

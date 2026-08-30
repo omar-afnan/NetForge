@@ -11,10 +11,10 @@ const CANVAS_W = 1240
 const CANVAS_H = 560
 
 const typeColors: Record<string, string> = {
-  pc: '#2ec8f0',
+  pc: '#2563eb',
   switch: '#8b9cb3',
   router: '#f0b429',
-  server: '#34d399',
+  server: '#16a34a',
 }
 
 const typeLabels: Record<string, string> = {
@@ -22,6 +22,13 @@ const typeLabels: Record<string, string> = {
   switch: 'SW',
   router: 'RTR',
   server: 'SRV',
+}
+
+const typeIcons: Record<string, string> = {
+  pc: '/access-network-32.png',
+  switch: '/switch-255-32.png',
+  router: '/router-70-32.png',
+  server: '/the-server-62-32.png',
 }
 
 /** Seconds for one traffic-flow loop per cable kind — fiber is fastest, serial crawls. */
@@ -352,7 +359,7 @@ export function TopologyCanvas() {
             <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000" floodOpacity="0.5" />
           </filter>
           <filter id="selected-glow" x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#2ec8f0" floodOpacity="0.45" />
+            <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#2563eb" floodOpacity="0.35" />
           </filter>
         </defs>
 
@@ -494,18 +501,19 @@ export function TopologyCanvas() {
               <rect
                 width={NODE_W}
                 height={NODE_H}
-                fill={selected ? '#152030' : '#0e1520'}
-                stroke={selected ? '#2ec8f0' : failed ? '#f87171' : '#243040'}
+                fill={selected ? '#f8fafc' : '#ffffff'}
+                stroke={selected ? '#2563eb' : failed ? '#dc2626' : '#cbd5e1'}
                 strokeWidth={selected ? 1.5 : 1}
               />
               <rect x={0} y={0} width={NODE_W} height={3} fill={color} />
-              <text x={7} y={17} fill="#e8eef5" fontSize="10" fontFamily="Consolas, monospace" fontWeight="600">
+              <image href={typeIcons[device.type]} x={70} y={4} width={14} height={14} preserveAspectRatio="xMidYMid meet" />
+              <text x={7} y={17} fill="#0f172a" fontSize="10" fontFamily="Consolas, monospace" fontWeight="600">
                 {device.hostname}
               </text>
-              <text x={7} y={30} fill="#9aadc4" fontSize="8" fontFamily="Consolas, monospace">
+              <text x={7} y={30} fill="#475569" fontSize="8" fontFamily="Consolas, monospace">
                 {typeLabels[device.type]}
               </text>
-              <text x={7} y={43} fill="#5f7389" fontSize="8" fontFamily="Consolas, monospace">
+              <text x={7} y={43} fill="#64748b" fontSize="8" fontFamily="Consolas, monospace">
                 {primaryIp ?? 'n/a'}
               </text>
               {wirePicked && (

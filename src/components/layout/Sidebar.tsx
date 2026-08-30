@@ -15,11 +15,11 @@ import { useUIStore } from '@/store/uiStore'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'labs', label: 'Lab Library', icon: Library },
   { id: 'topology', label: 'Topology', icon: Network },
   { id: 'traffic', label: 'Traffic', icon: Radio },
   { id: 'issues', label: 'Issues', icon: AlertTriangle },
   { id: 'terminal', label: 'Terminal', icon: Terminal },
-  { id: 'labs', label: 'Lab Library', icon: Library },
   { id: 'settings', label: 'Settings', icon: Settings },
 ] as const
 

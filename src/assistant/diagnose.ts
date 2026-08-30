@@ -241,15 +241,24 @@ export function scanLab(): { problems: LabProblem[]; plan: ProposedChange[]; mat
   for (const device of getDevices()) {
     const primary = getPrimaryInterface(device)
     if (!primary?.ipAddress) continue
-    if ((device.type === 'pc' || device.type === 'server') && !device.defaultGateway) {
+    if (device.type === 'pc' || device.type === 'server') {
       const gw = findGatewayIpFor(device)
-      problems.push({
-        severity: 'warning',
-        summary: `${device.hostname} has no default gateway`,
-        detail: gw ? `Suggested gateway (its router on-link): ${gw}` : 'No router found on its segment.',
-      })
-      if (gw) {
-        fixes.push({ id: crypto.randomUUID(), summary: `Set ${device.hostname} default gateway → ${gw}`, deviceRef: device.hostname, kind: 'gateway', payload: { gateway: gw } })
+      if (!device.defaultGateway) {
+        problems.push({
+          severity: 'warning',
+          summary: `${device.hostname} has no default gateway`,
+          detail: gw ? `Suggested gateway (its router on-link): ${gw}` : 'No router found on its segment.',
+        })
+        if (gw) {
+          fixes.push({ id: crypto.randomUUID(), summary: `Set ${device.hostname} default gateway → ${gw}`, deviceRef: device.hostname, kind: 'gateway', payload: { gateway: gw } })
+        }
+      } else if (gw && device.defaultGateway !== gw) {
+        problems.push({
+          severity: 'critical',
+          summary: `${device.hostname} has an incorrect default gateway (${device.defaultGateway})`,
+          detail: `Its on-link router interface is ${gw}.`,
+        })
+        fixes.push({ id: crypto.randomUUID(), summary: `Fix ${device.hostname} default gateway → ${gw}`, deviceRef: device.hostname, kind: 'gateway', payload: { gateway: gw } })
       }
     }
     // Endpoints with no IP at all but a connected, up link.
@@ -274,10 +283,13 @@ export function scanLab(): { problems: LabProblem[]; plan: ProposedChange[]; mat
   }
 
   // Down links themselves.
-  const { links } = useNetworkStore.getState()
+  const { links, devices } = useNetworkStore.getState()
   for (const link of links) {
     if (link.status === 'down') {
-      problems.push({ severity: 'critical', summary: `Link ${link.id} is down`, detail: 'A down cable drops all traffic between its two endpoints.' })
+      const a = devices.find((d) => d.id === link.sourceDeviceId)?.hostname ?? link.sourceDeviceId
+      const b = devices.find((d) => d.id === link.targetDeviceId)?.hostname ?? link.targetDeviceId
+      problems.push({ severity: 'critical', summary: `Link ${a} ↔ ${b} is down`, detail: 'A down cable drops all traffic between its two endpoints.' })
+      fixes.push({ id: crypto.randomUUID(), summary: `Bring the link ${a} ↔ ${b} back up`, deviceRef: a, kind: 'link-status', payload: { linkId: link.id, status: 'up' } })
     }
   }
 

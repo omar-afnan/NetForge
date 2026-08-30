@@ -43,7 +43,12 @@ export function LabLibrary() {
                     )}
                     <span className="text-[13px] font-semibold text-[var(--text-primary)]">{lab.title}</span>
                   </div>
-                  <span className={`badge difficulty-${lab.difficulty}`}>{lab.difficulty}</span>
+                  <div className="flex items-center gap-1.5">
+                    {progress?.completed && (
+                      <span className="badge badge-completed">Completed</span>
+                    )}
+                    <span className={`badge difficulty-${lab.difficulty}`}>{lab.difficulty}</span>
+                  </div>
                 </div>
 
                 <div className="mt-1 font-data text-[10px] text-[var(--text-dim)]">
@@ -67,7 +72,9 @@ export function LabLibrary() {
                   className={`mt-3 flex items-center justify-center gap-1.5 border px-3 py-1.5 font-data text-[11px] transition-colors ${
                     active
                       ? 'cursor-default border-[var(--border)] text-[var(--text-dim)]'
-                      : 'border-[var(--accent-link)] text-[var(--accent-link)] hover:bg-[rgba(46,200,240,0.1)]'
+                      : progress?.completed
+                        ? 'border-[var(--status-up)] text-[var(--status-up)] hover:bg-[rgba(22,163,74,0.08)]'
+                        : 'border-[var(--accent-link)] text-[var(--accent-link)] hover:bg-[rgba(46,200,240,0.1)]'
                   }`}
                   onClick={() => {
                     loadLab(lab)
@@ -75,7 +82,7 @@ export function LabLibrary() {
                   }}
                 >
                   <Play className="h-3 w-3" />
-                  {active ? 'Currently loaded' : 'Load Lab'}
+                  {active ? 'Currently loaded' : progress?.completed ? 'Open Lab' : 'Load Lab'}
                 </button>
               </div>
             )

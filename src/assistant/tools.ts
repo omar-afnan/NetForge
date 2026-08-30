@@ -58,6 +58,14 @@ export function ping(sourceRef: string, destinationRef: string): ToolResult<Ping
   }
 
   const result = simulator.ping(source.hostname, destinationIp)
+  useNetworkStore.getState().logPacket({
+    source: source.hostname,
+    destination: destinationIp,
+    protocol: 'ICMP',
+    path: result.hops,
+    status: result.success ? 'success' : 'failed',
+    failureReason: result.success ? undefined : result.failureReason,
+  })
   return {
     ok: true,
     data: {

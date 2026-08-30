@@ -1,4 +1,5 @@
 import { useCopilotStore } from '@/store/copilotStore'
+import { useNetworkStore } from '@/store/networkStore'
 import { runConnectivityMatrix } from './tools'
 import { diagnosePing, formatMatrix } from './diagnose'
 import { text, buildPlan, planMessage, executeChange, newId, MODE_HINT } from './engine.core'
@@ -109,6 +110,14 @@ export function applyPlan(changeIds?: string[]): void {
   const passing = matrix.filter((t) => t.success).length
   const summary = passing === matrix.length ? `Verification: all ${matrix.length} tests pass. 🎉` : `Verification: ${passing}/${matrix.length} tests pass — investigating…`
   store.pushMessage(text(`${summary}\n\n${formatMatrix(matrix)}`))
+  // If the whole lab now passes, mark it completed in the Lab Library.
+  if (passing === matrix.length) {
+    const lab = useNetworkStore.getState().lab
+    if (lab.id && lab.id !== 'starter') {
+      useNetworkStore.getState().completeLab(lab.id, true)
+      store.pushMessage(text(`🎉 "${lab.title}" is solved — all ${matrix.length} tests pass. Marked as Completed in your Lab Library.`))
+    }
+  }
   store.setPendingPlan(null)
   store.setStatus('idle')
   if (passing < matrix.length) {

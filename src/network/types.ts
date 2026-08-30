@@ -75,6 +75,8 @@ export interface Packet {
   path: string[]
   status: 'success' | 'failed'
   failureReason?: string
+  /** ISO timestamp of when the packet was logged. */
+  timestamp?: string
 }
 
 export interface PingResult {

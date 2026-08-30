@@ -1,4 +1,4 @@
-import { Cable, Monitor, MousePointer2, Network, RotateCcw, Router, Server, Trash2 } from 'lucide-react'
+import { Cable, MousePointer2, RotateCcw, Trash2 } from 'lucide-react'
 import type { DeviceType } from '@/network/types'
 import { CABLE_KINDS, cableMeta } from '@/network/cables'
 import { useNetworkStore } from '@/store/networkStore'
@@ -10,11 +10,11 @@ const TOOLS: { tool: 'select' | 'wire' | 'delete'; label: string; icon: typeof C
   { tool: 'delete', label: 'Delete', icon: Trash2 },
 ]
 
-const DEVICE_TYPES: { type: DeviceType; label: string; icon: typeof Monitor }[] = [
-  { type: 'pc', label: 'PC', icon: Monitor },
-  { type: 'switch', label: 'Switch', icon: Network },
-  { type: 'router', label: 'Router', icon: Router },
-  { type: 'server', label: 'Server', icon: Server },
+const DEVICE_TYPES: { type: DeviceType; label: string; icon: string }[] = [
+  { type: 'pc', label: 'PC', icon: '/access-network-32.png' },
+  { type: 'switch', label: 'Switch', icon: '/switch-255-32.png' },
+  { type: 'router', label: 'Router', icon: '/router-70-32.png' },
+  { type: 'server', label: 'Server', icon: '/the-server-62-32.png' },
 ]
 
 const TOOL_HINTS: Record<string, string> = {
@@ -66,7 +66,7 @@ export function TopologyToolbar() {
 
       <div className="flex items-center gap-1">
         <span className="mr-1 text-[9px] uppercase tracking-wider text-[var(--text-dim)]">Add:</span>
-        {DEVICE_TYPES.map(({ type, label, icon: Icon }) => (
+        {DEVICE_TYPES.map(({ type, label, icon }) => (
           <button
             key={type}
             className={toolButtonClass(topologyTool === 'place' && pendingDeviceType === type)}
@@ -75,7 +75,7 @@ export function TopologyToolbar() {
               setTopologyTool('place')
             }}
           >
-            <Icon className="h-3 w-3" />
+            <img src={icon} alt={label} className="h-5 w-5 object-contain" />
             {label}
           </button>
         ))}

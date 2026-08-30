@@ -1,300 +1,277 @@
-import type { Device, NetworkLink } from '@/network/types'
 import type { AssistStep } from '@/store/copilotStore'
 import { useCopilotStore } from '@/store/copilotStore'
 import { useNetworkStore } from '@/store/networkStore'
-import { getPrimaryInterface } from '@/network/devices'
-import { NetworkSimulator } from '@/network/simulator'
+import { useUIStore } from '@/store/uiStore'
+import { runConnectivityMatrix } from './tools'
+import { scanLab, formatMatrix } from './diagnose'
+import { executeChange } from './engine.core'
 
-export interface LabAssistContext {
-  labId: string
-  devices: Device[]
-  links: NetworkLink[]
-  simulator: NetworkSimulator
-  pushMessage: (message: { id: string; role: 'assistant'; kind: 'text' | 'plan'; text: string; planId?: string }) => void
-  setStatus: (status: 'idle' | 'thinking' | 'working') => void
-  setHighlight: (deviceId: string | null) => void
-  setPacketTrace: (trace: { id: string; path: string[]; success: boolean } | null) => void
-  selectDevice: (deviceId: string | null) => void
-  completeLab: (aiAssisted: boolean) => void
-}
+import type { ProposedChange } from './types'
 
 function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms))
 }
 
+function setSteps(steps: AssistStep[]) {
+  useCopilotStore.getState().setLabAssistSteps(steps)
+}
+
+function push(text: string) {
+  useCopilotStore.getState().pushMessage({
+    id: crypto.randomUUID(),
+    role: 'assistant',
+    kind: 'text',
+    text,
+  })
+}
+
+/** Best-effort CLI-looking echo for a proposed change, shown in the live feed. */
+function commandEcho(change: ProposedChange): string {
+  const p = change.payload as {
+    interfaceRef?: string
+    ip?: string
+    mask?: string
+    prefix?: number
+    status?: 'up' | 'down'
+    gateway?: string
+    destination?: string
+    nextHop?: string
+    linkId?: string
+  }
+  const host = change.deviceName ?? change.deviceRef ?? 'device'
+  switch (change.kind) {
+    case 'gateway':
+      return `> ${host} set gateway ${p.gateway ?? ''}`
+    case 'interface':
+      return `> ${host} ip ${p.ip ?? ''} ${p.mask ?? (p.prefix ? `/${p.prefix}` : '')}`
+    case 'interface-status':
+      return `> ${host} interface ${p.interfaceRef ?? ''} ${p.status ?? 'up'}`
+    case 'route-add':
+      return `> ${host} ip route ${p.destination ?? ''} ${p.nextHop ?? ''}`
+    case 'route-remove':
+      return `> ${host} no ip route ${p.destination ?? ''}`
+    case 'link-status':
+      return `> ${host} no shutdown (restore link)`
+    default:
+      return `> ${change.summary}`
+  }
+}
+
+/**
+ * Take over the loaded lab: detect its real fault, walk the student through a
+ * visible step-by-step timeline, apply each fix, verify, and mark the lab as
+ * completed in the Lab Library when every connectivity test passes.
+ */
 export async function runLabAssist(labId: string) {
   const store = useCopilotStore.getState()
   const net = useNetworkStore.getState()
+  const lab = net.lab
 
+  // Nothing broken yet.
+  const line = (text: string, tone: 'info' | 'ok' | 'warn' | 'cmd' | 'header' = 'info') =>
+    store.pushTakeoverLine(text, tone)
+
+  const { problems, plan, matrix } = scanLab()
+
+  // Nothing to automate — still give a visible takeover moment.
+  if (plan.length === 0) {
+    store.startLabAssist(labId, [])
+    store.setTakeoverPhase('working')
+    line('🤖 AI TAKEOVER', 'header')
+    await delay(600)
+    line('Analyzing the network...')
+    await delay(800)
+    const allPass = matrix.every((t) => t.success)
+    if (allPass) {
+      line('✓ Topology identified', 'ok')
+      await delay(400)
+      line('Running connectivity tests...')
+      await delay(800)
+      line('✓ All tests passing — nothing to fix', 'ok')
+      store.setTakeoverSummary(
+        `I analyzed "${lab.title}" and everything is already healthy —\nall connectivity tests pass. Nothing needed fixing.\n\n✓ Lab objective completed`,
+      )
+      store.setTakeoverPhase('summary')
+      net.completeLab(labId, true)
+      return
+    }
+    await delay(400)
+    line('⚠ Found issues I can\'t safely automate', 'warn')
+    await delay(600)
+    store.setTakeoverPhase('idle')
+    store.stopLabAssist()
+    push(
+      [
+        `I checked \"${lab.title}\" — here's what I found:`,
+        '',
+        ...problems.map((p) => `${p.severity === 'critical' ? '🔴' : p.severity === 'warning' ? '🟠' : '🔵'} ${p.summary}`),
+        '',
+        'I couldn\'t find safe automatic fixes for these — they likely need manual topology changes (cabling, new devices, etc.).',
+        'Try asking me "why can\'t PC-01 ping SRV-01?" and I\'ll walk you through the fix step by step.',
+      ].join('\n'),
+    )
+    return
+  }
+
+  // Every plan change becomes a visible timeline step, with a verify step at the end.
+  const fixSteps: AssistStep[] = plan.map((change, i) => ({
+    id: `fix-${i}`,
+    label: change.summary,
+    detail: change.detail ?? 'Applying configuration',
+    status: 'pending',
+  }))
   const steps: AssistStep[] = [
-    { id: 'inspect', label: 'Inspecting affected device', detail: 'Checking host configuration', status: 'pending' },
-    { id: 'local-ping', label: 'Testing local connectivity', detail: 'Verifying LAN communication', status: 'pending' },
-    { id: 'remote-ping', label: 'Testing external connectivity', detail: 'Checking gateway forwarding', status: 'pending' },
-    { id: 'diagnose', label: 'Comparing configuration', detail: 'Identifying the fault', status: 'pending' },
-    { id: 'propose', label: 'Proposing fix', detail: 'Waiting for approval', status: 'pending' },
-    { id: 'apply', label: 'Applying correction', detail: 'Updating configuration', status: 'pending' },
-    { id: 'verify', label: 'Verifying connectivity', detail: 'Confirming the fix', status: 'pending' },
+    { id: 'inspect', label: 'Inspecting the lab', detail: 'Running reachability audit', status: 'active' },
+    ...fixSteps,
+    { id: 'verify', label: 'Verifying connectivity', detail: 'Re-running every test', status: 'pending' },
   ]
 
   store.startLabAssist(labId, steps)
-  store.setStatus('thinking')
+  store.setStatus('working')
 
-  const ctx: LabAssistContext = {
-    labId,
-    devices: net.devices,
-    links: net.links,
-    simulator: net.simulator,
-    pushMessage: (msg) => store.pushMessage(msg),
-    setStatus: (status) => store.setStatus(status),
-    setHighlight: (deviceId) => store.setLabAssistHighlight(deviceId),
-    setPacketTrace: (trace) => net.setPacketTrace(trace),
-    selectDevice: (deviceId) => net.selectDevice(deviceId),
-    completeLab: (aiAssisted) => net.completeLab(labId, aiAssisted),
-  }
+  const advance = (idx: number, status: 'active' | 'done') =>
+    setSteps(
+      steps.map((s, i) => {
+        if (i === idx) return { ...s, status }
+        if (i < idx) return { ...s, status: 'done' }
+        return { ...s, status: 'pending' }
+      }),
+    )
+
+  const markAllDone = () => setSteps(steps.map((s) => ({ ...s, status: 'done' })))
 
   try {
-    await investigateWrongGateway(ctx)
+    // ---- Live takeover sequence on the real lab UI ----
+    useUIStore.getState().setActiveView('topology')
+    await delay(700)
+    line('Analyzing the network...', 'info')
+    await delay(900)
+    line('✓ Topology identified', 'ok')
+    await delay(500)
+
+    const applied: ProposedChange[] = []
+    let matrixAfter = matrix
+    let success = false
+
+    // Up to 3 diagnose → apply → verify rounds: after each pass the AI
+    // re-scans the live network, so cascading faults get fixed visibly too.
+    for (let round = 1; round <= 3; round++) {
+      const scan = round === 1 ? { problems, plan, matrix } : scanLab()
+      if (scan.plan.length === 0) {
+        if (scan.matrix.every((t) => t.success)) {
+          success = true
+          matrixAfter = scan.matrix
+        }
+        break
+      }
+      if (round > 1) {
+        line(`Round ${round} — re-diagnosing...`, 'info')
+        await delay(700)
+      }
+
+      for (let i = 0; i < scan.plan.length; i++) {
+        const change = scan.plan[i]
+        const host = change.deviceName ?? change.deviceRef ?? 'device'
+        if (i < fixSteps.length) advance(i + 1, 'active')
+
+        line(`Connecting to ${host}...`, 'info')
+        await delay(600)
+        if (change.deviceRef) net.setHighlightedDevice(change.deviceRef)
+        line(commandEcho(change), 'cmd')
+        await delay(700)
+        line(`${change.detail ?? 'Applying configuration'}...`, 'info')
+        await delay(500)
+
+        const outcome = executeChange(change)
+        store.addAction({
+          id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+          message: `Applied: ${change.summary}`,
+          type: outcome.ok ? 'success' : 'warning',
+        })
+        line(outcome.ok ? `✓ ${change.summary}` : `⚠ ${change.summary} (check manually)`, outcome.ok ? 'ok' : 'warn')
+        push(`${outcome.ok ? '✅' : '❌'} ${host}: ${change.summary}\n${outcome.report}`)
+        applied.push(change)
+        await delay(650)
+        net.setHighlightedDevice(null)
+      }
+
+    // ---- Verify all connectivity, visibly ----
+    advance(steps.length - 1, 'active')
+    line('Verifying lab objective...', 'info')
+    await delay(700)
+    matrixAfter = runConnectivityMatrix()
+    const passing = matrixAfter.filter((t) => t.success).length
+    if (passing === matrixAfter.length) {
+      success = true
+      break
+    }
+    if (round < 3) {
+      line(`⚠ ${passing}/${matrixAfter.length} tests passing — re-diagnosing...`, 'warn')
+      await delay(800)
+    }
+    }
+
+    if (success) {
+      markAllDone()
+      for (const t of matrixAfter.slice(0, 4)) {
+        line(`> ping ${t.destination ?? ''}`, 'cmd')
+        await delay(450)
+        line(t.success ? '✓ Connection successful' : '✗ No response', t.success ? 'ok' : 'warn')
+        await delay(300)
+      }
+      if (matrixAfter.length > 4) {
+        line(`✓ ${matrixAfter.length} connectivity tests passing`, 'ok')
+      }
+      await delay(500)
+
+      // Keep the takeover phase at 'summary' so the overlay typewrites the
+      // explanation, then the overlay itself moves to 'complete' and redirects.
+      net.completeLab(labId, true)
+      push(`✅ Verification passed — all ${matrixAfter.length} connectivity tests are green.\n\n${formatMatrix(matrixAfter)}`)
+      store.setTakeoverSummary(
+        [
+          `🤖 AI completed the lab.`,
+          '',
+          `I found and fixed ${applied.length === 1 ? 'an issue' : `${applied.length} issues`} in "${lab.title}":`,
+          ...applied.map((c) => `✅ ${c.summary}`),
+          '',
+          `I corrected the configuration and re-tested every`,
+          `connectivity path in the topology.`,
+          '',
+          `✓ All ${matrixAfter.length} tests passing`,
+          `✓ Lab objective completed`,
+        ].join('\n'),
+      )
+      store.setTakeoverPhase('summary')
+    } else {
+      markAllDone()
+      const passingNow = matrixAfter.filter((t) => t.success).length
+      line(`⚠ ${passingNow}/${matrixAfter.length} tests passing`, 'warn')
+      await delay(600)
+      store.setTakeoverPhase('idle')
+      store.stopLabAssist()
+      push(
+        [
+          `I dug into "${lab.title}" and got ${passingNow}/${matrixAfter.length} tests passing, but ran out of safe automatic fixes.`,
+          '',
+          'What I fixed along the way:',
+          ...(applied.length ? applied.map((c) => `✅ ${c.summary}`) : ['— nothing was safely automatable']),
+          '',
+          'Current results:',
+          formatMatrix(matrixAfter),
+          '',
+          `Ask me to "find the problem" and I'll explain what's still broken.`,
+        ].join('\n'),
+      )
+    }
   } catch (error) {
-    store.pushMessage({
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      kind: 'text',
-      text: `[ERROR] Something went wrong: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    })
+    store.setTakeoverPhase('idle')
+    store.stopLabAssist()
+    push(`[ERROR] ${error instanceof Error ? error.message : 'Unknown error'}`)
   } finally {
     store.setStatus('idle')
     store.setLabAssistBusy(false)
-    store.stopLabAssist()
     net.setHighlightedDevice(null)
   }
-}
-
-async function investigateWrongGateway(ctx: LabAssistContext) {
-  const { devices, links, simulator } = ctx
-
-  const affected = devices.find((d) => d.id === 'pc-02') ?? devices.find((d) => d.type === 'pc') ?? null
-  if (!affected) {
-    ctx.pushMessage({
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      kind: 'text',
-      text: 'I could not find a workstation to investigate.',
-    })
-    return
-  }
-
-  const gateway = affected.defaultGateway
-  const primaryIface = getPrimaryInterface(affected)
-  const pcIp = primaryIface?.ipAddress ?? 'n/a'
-  const pcMask = primaryIface?.subnetMask ?? 'n/a'
-
-  // Step 1: Inspect device
-  ctx.setHighlight(affected.id)
-  ctx.selectDevice(affected.id)
-  ctx.pushMessage({
-    id: crypto.randomUUID(),
-    role: 'assistant',
-    kind: 'text',
-    text: `[INSPECT] Inspecting ${affected.hostname}\n\nWhy?\nThe problem affects only one workstation, so we will start by checking its configuration.\n\nFindings:\n- IPv4: ${pcIp}\n- Subnet Mask: ${pcMask}\n- Default Gateway: ${gateway ?? 'not set'}`,
-  })
-  await delay(1800)
-  ctx.setStatus('thinking')
-  useCopilotStore.getState().advanceLabAssist()
-  await delay(600)
-
-  // Step 2: Test local connectivity
-  ctx.setStatus('working')
-  const localTarget = devices.find((d) => d.id !== affected.id && d.type === 'pc' && getPrimaryInterface(d)?.ipAddress)
-  if (localTarget) {
-    const localIp = getPrimaryInterface(localTarget)?.ipAddress
-    const localResult = simulator.forward(affected.hostname, localIp ?? localTarget.hostname)
-    ctx.setPacketTrace({ id: crypto.randomUUID(), path: localResult.path, success: localResult.success })
-
-    ctx.pushMessage({
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      kind: 'text',
-      text: `[TEST] Testing local connectivity: ${affected.hostname} -> ${localTarget.hostname}\n\nWhy?\nIf local communication works, the switch, cabling, and local subnet are less likely to be the problem.\n\nResult: ${localResult.success ? '[PASS] Reply received' : '[FAIL] ' + (localResult.failureReason ?? 'Failed')}`,
-    })
-    await delay(2200)
-    ctx.setPacketTrace(null)
-    useCopilotStore.getState().advanceLabAssist()
-  }
-
-  // Step 3: Test external connectivity
-  const remoteTarget = devices.find((d) => d.type === 'server' && getPrimaryInterface(d)?.ipAddress)
-  if (remoteTarget) {
-    const remoteIp = getPrimaryInterface(remoteTarget)?.ipAddress
-    const remoteResult = simulator.forward(affected.hostname, remoteIp ?? remoteTarget.hostname)
-    ctx.setPacketTrace({ id: crypto.randomUUID(), path: remoteResult.path, success: remoteResult.success })
-
-    ctx.pushMessage({
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      kind: 'text',
-      text: `[TEST] Testing external connectivity: ${affected.hostname} -> ${remoteTarget.hostname}\n\nWhy?\nThis tells us whether the workstation can send traffic beyond its local subnet.\n\nResult: ${remoteResult.success ? '[PASS] Reply received' : '[FAIL] ' + (remoteResult.failureReason ?? 'Failed')}`,
-    })
-    await delay(2200)
-    ctx.setPacketTrace(null)
-    useCopilotStore.getState().advanceLabAssist()
-  }
-
-  // Step 4: Diagnose
-  ctx.setStatus('thinking')
-  await delay(800)
-
-  const expectedGateway = findExpectedGateway(affected, devices, links)
-  const hasWrongGateway = gateway && expectedGateway && gateway !== expectedGateway
-
-  ctx.pushMessage({
-    id: crypto.randomUUID(),
-    role: 'assistant',
-    kind: 'text',
-    text: `[DIAGNOSE] Comparing gateway configuration\n\nCurrent gateway: ${gateway ?? 'not set'}\nExpected gateway: ${expectedGateway ?? 'unknown'}\n\n${
-      hasWrongGateway
-        ? `I found the problem. ${affected.hostname} has a default gateway (${gateway}) that does not point to the router on this LAN.\n\nThe workstation can communicate with devices on its own subnet because those devices are directly reachable. When ${affected.hostname} needs to reach another network, it sends the packet to its default gateway. Because the configured gateway is incorrect, traffic leaving the subnet cannot be forwarded.`
-        : 'The configuration appears consistent. The issue may be elsewhere.'
-    }`,
-  })
-  await delay(1500)
-  useCopilotStore.getState().advanceLabAssist()
-
-  if (!hasWrongGateway) {
-    ctx.setHighlight(null)
-    return
-  }
-
-  // Step 5: Propose fix
-  const changes = [
-    {
-      id: crypto.randomUUID(),
-      kind: 'gateway' as const,
-      deviceRef: affected.hostname,
-      summary: `Set ${affected.hostname} default gateway -> ${expectedGateway}`,
-      payload: { gateway: expectedGateway },
-    },
-  ]
-
-  const plan = {
-    id: crypto.randomUUID(),
-    title: `Fix default gateway on ${affected.hostname}`,
-    rationale: [`Default gateway is misconfigured on ${affected.hostname}`],
-    changes,
-  }
-
-  useCopilotStore.getState().setPendingPlan(plan)
-  ctx.pushMessage({
-    id: crypto.randomUUID(),
-    role: 'assistant',
-    kind: 'plan',
-    text: `[PROPOSAL] Fix default gateway\n\nCurrent: ${gateway}\nCorrect: ${expectedGateway}\n\nApply this change?`,
-    planId: plan.id,
-  })
-
-  // Wait for user approval
-  await waitForPlanApproval()
-  ctx.setStatus('working')
-  useCopilotStore.getState().advanceLabAssist()
-
-  // Step 6: Apply fix
-  ctx.pushMessage({
-    id: crypto.randomUUID(),
-    role: 'assistant',
-    kind: 'text',
-    text: `[APPLY] Updating ${affected.hostname} default gateway:\n\n${gateway}\n\t\t↓\n${expectedGateway}`,
-  })
-  await delay(1200)
-
-  useNetworkStore.getState().updateDevice(affected.id, { defaultGateway: expectedGateway })
-  await delay(600)
-  useCopilotStore.getState().advanceLabAssist()
-
-  // Refresh local state after mutation
-  const updatedDevices = useNetworkStore.getState().devices
-  const updatedAffected = updatedDevices.find((d) => d.id === affected.id)
-  if (updatedAffected) {
-    ctx.pushMessage({
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      kind: 'text',
-      text: `[DONE] ${updatedAffected.hostname} default gateway updated to ${updatedAffected.defaultGateway}.`,
-    })
-  }
-
-  await delay(1000)
-
-  // Step 7: Verify
-  if (remoteTarget && updatedAffected) {
-    const verifyResult = simulator.forward(updatedAffected.hostname, getPrimaryInterface(remoteTarget)?.ipAddress ?? remoteTarget.hostname)
-    ctx.setPacketTrace({ id: crypto.randomUUID(), path: verifyResult.path, success: verifyResult.success })
-
-    ctx.pushMessage({
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      kind: 'text',
-      text: `[VERIFY] Testing connectivity after fix: ${updatedAffected.hostname} -> ${remoteTarget.hostname}\n\nResult: ${verifyResult.success ? '[PASS] Reply received' : '[FAIL] ' + (verifyResult.failureReason ?? 'Failed')}`,
-    })
-    await delay(2200)
-    ctx.setPacketTrace(null)
-    useCopilotStore.getState().advanceLabAssist()
-  }
-
-  ctx.setHighlight(null)
-  ctx.completeLab(true)
-
-  ctx.pushMessage({
-    id: crypto.randomUUID(),
-    role: 'assistant',
-    kind: 'text',
-    text: `[LAB COMPLETE] ✓ The Wrong Gateway\n\nThe workstation can now reach networks outside its local subnet. The default gateway was the problem.\n\nSkills practiced:\n- Default Gateway\n- Local vs Remote Networks\n- Connectivity Troubleshooting\n- Host Configuration`,
-  })
-}
-
-function findExpectedGateway(device: Device, devices: Device[], links: NetworkLink[]): string | undefined {
-  const primary = getPrimaryInterface(device)
-  if (!primary?.ipAddress || !primary.subnetMask) return undefined
-  const primaryIp = primary.ipAddress
-  const primaryMask = primary.subnetMask
-
-  const neighbors = links
-    .filter((l) => l.sourceDeviceId === device.id || l.targetDeviceId === device.id)
-    .map((l) => (l.sourceDeviceId === device.id ? l.targetDeviceId : l.sourceDeviceId))
-
-  for (const neighborId of neighbors) {
-    const neighbor = devices.find((d) => d.id === neighborId)
-    if (!neighbor) continue
-    if (neighbor.type === 'router' || neighbor.type === 'switch') {
-      const routerIface = neighbor.interfaces.find(
-        (iface) => iface.ipAddress && iface.subnetMask && isSameSubnet(iface.ipAddress, primaryIp, primaryMask) && iface.status === 'up',
-      )
-      if (routerIface) return routerIface.ipAddress
-    }
-  }
-
-  return undefined
-}
-
-function isSameSubnet(ip: string, gateway: string, mask: string): boolean {
-  const ipParts = ip.split('.').map(Number)
-  const gwParts = gateway.split('.').map(Number)
-  const maskParts = mask.split('.').map(Number)
-  if (ipParts.some(Number.isNaN) || gwParts.some(Number.isNaN) || maskParts.some(Number.isNaN)) return false
-  for (let i = 0; i < 4; i++) {
-    if ((ipParts[i] & maskParts[i]) !== (gwParts[i] & maskParts[i])) return false
-  }
-  return true
-}
-
-function waitForPlanApproval(): Promise<void> {
-  return new Promise((resolve) => {
-    const check = () => {
-      const store = useCopilotStore.getState()
-      if (store.status === 'idle' && !store.labAssist.enabled) {
-        resolve()
-        return
-      }
-      window.setTimeout(check, 500)
-    }
-    window.setTimeout(check, 500)
-  })
 }

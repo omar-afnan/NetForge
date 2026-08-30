@@ -3,13 +3,13 @@ import { getDeviceById } from '@/network/devices'
 import { useNetworkStore } from '@/store/networkStore'
 import { useSettingsStore } from '@/store/settingsStore'
 import { LinkInspector } from '@/components/topology/LinkInspector'
-import { Server, Router, Monitor, HardDrive } from 'lucide-react'
+import { Monitor } from 'lucide-react'
 
-const typeIcons = {
-  pc: Monitor,
-  switch: HardDrive,
-  router: Router,
-  server: Server,
+const typeIcons: Record<string, string> = {
+  pc: '/access-network-32.png',
+  switch: '/switch-255-32.png',
+  router: '/router-70-32.png',
+  server: '/the-server-62-32.png',
 }
 
 export function DeviceInspector() {
@@ -40,14 +40,14 @@ export function DeviceInspector() {
 
   const routes = simulator.getRoutingTable(device.hostname)
   const arp = simulator.getARPTable(device.hostname)
-  const Icon = typeIcons[device.type]
+  const iconPath = typeIcons[device.type] ?? '/access-network-32.png'
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] p-3">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center border border-[var(--border-bright)] bg-[var(--bg-panel)]">
-            <Icon className="h-4 w-4 text-[var(--accent-link)]" strokeWidth={1.5} />
+            <img src={iconPath} alt={device.type} className="h-6 w-6 object-contain" />
           </div>
           <div>
             <div className="font-data text-sm font-semibold">{device.hostname}</div>

@@ -1,10 +1,14 @@
 import { create } from 'zustand'
+import { celebrateLab } from '@/lib/celebrate'
+import { useCopilotStore } from './copilotStore'
+
 import type {
   CableKind,
   Device,
   DeviceType,
   NetworkIssue,
   NetworkLink,
+  Packet,
   PacketTrace,
   ProposedFix,
 } from '@/network/types'
@@ -51,7 +55,8 @@ function persistLabProgress(progress: Record<string, { completed: boolean; compl
 
 function persistState(state: NetworkState) {
   try {
-    const { simulator, ...rest } = state as any
+    // packets is a live, in-memory session log — never persisted.
+    const { simulator, packets, ...rest } = state as any
     localStorage.setItem(STORAGE_KEY, JSON.stringify(rest))
   } catch {
     // ignore quota errors
@@ -70,6 +75,7 @@ interface NetworkState {
   issues: NetworkIssue[]
   failures: FailureInjection[]
   proposedFixes: ProposedFix[]
+  packets: Packet[]
   selectedDeviceId: string | null
   selectedLinkId: string | null
   packetTrace: PacketTrace | null
@@ -103,6 +109,8 @@ interface NetworkState {
   ) => void
   setPacketTrace: (trace: PacketTrace | null) => void
   clearPacketTrace: () => void
+  logPacket: (entry: Omit<Packet, 'id'>) => void
+  clearPackets: () => void
   setHighlightedDevice: (deviceId: string | null) => void
   completeLab: (labId: string, aiAssisted: boolean) => void
   resetLabProgress: (labId: string) => void
@@ -275,6 +283,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
         links: persisted.links,
         failures: persisted.failures ?? [],
         proposedFixes: persisted.proposedFixes ?? [],
+        packets: [],
         selectedDeviceId: persisted.selectedDeviceId ?? null,
         selectedLinkId: persisted.selectedLinkId ?? null,
         packetTrace: persisted.packetTrace ?? null,
@@ -290,6 +299,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
         issues: [],
         failures: [],
         proposedFixes: [],
+        packets: [],
         selectedDeviceId: null,
         selectedLinkId: null,
         packetTrace: null,
@@ -315,10 +325,15 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
         packetTrace: null,
         ...commit(broken.devices, broken.links),
       })
+      useCopilotStore.getState().switchLab(lab.id)
     },
 
   // Discard every manual change and re-inject the lab's baseline faults.
-  resetLab: () => get().loadLab(get().lab),
+  resetLab: () => {
+    const { lab } = get()
+    get().resetLabProgress(lab.id)
+    get().loadLab(lab)
+  },
 
   // Remove the injected faults entirely (network becomes the pristine baseline).
   clearFaults: () => {
@@ -510,9 +525,20 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
   setPacketTrace: (packetTrace) => set({ packetTrace }),
 
   clearPacketTrace: () => set({ packetTrace: null }),
+
+  logPacket: (entry) =>
+    set((state) => ({
+      packets: [
+        { id: crypto.randomUUID(), timestamp: new Date().toISOString(), ...entry },
+        ...state.packets,
+      ].slice(0, 200),
+    })),
+
+  clearPackets: () => set({ packets: [] }),
   setHighlightedDevice: (deviceId) => set({ highlightedDeviceId: deviceId }),
   completeLab: (labId, aiAssisted) => {
     const progress = { ...get().completedLabs }
+    const firstCompletion = !progress[labId]?.completed
     progress[labId] = {
       completed: true,
       completedAt: new Date().toISOString(),
@@ -522,6 +548,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
     }
     set({ completedLabs: progress })
     persistLabProgress(progress)
+    if (firstCompletion) celebrateLab()
   },
   resetLabProgress: (labId) => {
     const progress = { ...get().completedLabs }

@@ -1,3 +1,4 @@
+import { useNetworkStore } from '@/store/networkStore'
 import type { AssistantMessage, LabPlan, MessageAction, ProposedChange } from './types'
 import {
   addStaticRoute,
@@ -40,6 +41,7 @@ export function executeChange(change: ProposedChange): { ok: boolean; report: st
     gateway?: string
     destination?: string
     nextHop?: string
+    linkId?: string
   }
   switch (change.kind) {
     case 'gateway':
@@ -54,6 +56,11 @@ export function executeChange(change: ProposedChange): { ok: boolean; report: st
     case 'route-remove':
       if (!p.destination) return { ok: false, report: 'Incomplete route payload.' }
       return wrap(removeStaticRoute({ deviceRef: change.deviceRef, destination: p.destination, mask: p.mask, prefix: p.prefix }))
+    case 'link-status': {
+      if (!p.linkId) return { ok: false, report: 'Missing link id.' }
+      useNetworkStore.getState().setLinkStatus(p.linkId, p.status ?? 'up')
+      return { ok: true, report: 'Link restored.' }
+    }
     default:
       return { ok: false, report: `Unsupported change kind: ${change.kind}` }
   }
