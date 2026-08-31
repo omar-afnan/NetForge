@@ -10,6 +10,7 @@ const TopologyCanvas = lazy(() => import('@/components/topology/TopologyCanvas')
 import { TopologyToolbar } from '@/components/topology/TopologyToolbar'
 const NetworkTerminal = lazy(() => import('@/components/terminal/NetworkTerminal').then((m) => ({ default: m.NetworkTerminal })))
 import { SettingsView } from '@/components/settings/SettingsView'
+import { LearnView } from '@/components/learn/LearnView'
 import { LandingPage } from '@/components/landing/LandingPage'
 import { TakeoverOverlay } from '@/components/assistant/TakeoverOverlay'
 import { useUIStore } from '@/store/uiStore'
@@ -130,6 +131,11 @@ function App() {
   switch (activeView) {
     case 'dashboard':
       main = <DashboardView />
+      break
+    case 'learn':
+      main = <LearnView />
+      bottom = undefined
+      right = undefined
       break
     case 'topology':
       main = <TopologyView />

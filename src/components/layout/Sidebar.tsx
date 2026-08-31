@@ -1,6 +1,7 @@
 import {
   Activity,
   AlertTriangle,
+  BookOpen,
   LayoutDashboard,
   Library,
   Network,
@@ -15,6 +16,7 @@ import { useUIStore } from '@/store/uiStore'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'learn', label: 'Learn', icon: BookOpen },
   { id: 'labs', label: 'Lab Library', icon: Library },
   { id: 'topology', label: 'Topology', icon: Network },
   { id: 'traffic', label: 'Traffic', icon: Radio },

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { CableKind, DeviceType } from '@/network/types'
 
-type View = 'dashboard' | 'topology' | 'traffic' | 'issues' | 'agents' | 'reports' | 'labs' | 'settings' | 'terminal'
+type View = 'dashboard' | 'learn' | 'topology' | 'traffic' | 'issues' | 'agents' | 'reports' | 'labs' | 'settings' | 'terminal'
 
 export type TopologyTool = 'select' | 'wire' | 'delete' | 'place'
 

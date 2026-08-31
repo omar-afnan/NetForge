@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Device } from '@/network/types'
+import type { Device, NetworkLink } from '@/network/types'
 import { cableMeta } from '@/network/cables'
 import { useNetworkStore } from '@/store/networkStore'
 import { useSettingsStore } from '@/store/settingsStore'
@@ -104,6 +104,72 @@ function pointAlongPath(points: Point[], t: number): Point {
     remaining -= lengths[i]
   }
   return points[points.length - 1]
+}
+
+/**
+ * Expand a list of routed (L3) hop devices into the full physical route:
+ * consecutive hops that are not directly cabled (e.g. a PC and its router
+ * on either side of a switch) are joined by the shortest path through the
+ * actual rendered links, so the packet rides the real cables instead of
+ * cutting a straight chord across intermediate devices.
+ */
+function expandOverLinks(
+  hops: Device[],
+  allDevices: Device[],
+  allLinks: NetworkLink[],
+): Device[] {
+  if (hops.length < 2) return hops
+
+  const deviceById = new Map(allDevices.map((d) => [d.id, d]))
+  const adjacency = new Map<string, Set<string>>()
+  for (const link of allLinks) {
+    // Include down links too — a failing ping should still ride the cable
+    // to the point where it dies.
+    const a = deviceById.get(link.sourceDeviceId)
+    const b = deviceById.get(link.targetDeviceId)
+    if (!a?.position || !b?.position) continue
+    if (!adjacency.has(a.id)) adjacency.set(a.id, new Set())
+    if (!adjacency.has(b.id)) adjacency.set(b.id, new Set())
+    adjacency.get(a.id)!.add(b.id)
+    adjacency.get(b.id)!.add(a.id)
+  }
+
+  function shortestPath(fromId: string, toId: string): Device[] | null {
+    if (fromId === toId) return [deviceById.get(fromId)!]
+    const prev = new Map<string, string | null>([[fromId, null]])
+    const queue = [fromId]
+    while (queue.length > 0) {
+      const current = queue.shift()!
+      for (const next of adjacency.get(current) ?? []) {
+        if (prev.has(next)) continue
+        prev.set(next, current)
+        if (next === toId) {
+          const chain: Device[] = []
+          let walk: string | null = toId
+          while (walk) {
+            chain.unshift(deviceById.get(walk)!)
+            walk = prev.get(walk) ?? null
+          }
+          return chain
+        }
+        queue.push(next)
+      }
+    }
+    return null
+  }
+
+  const expanded: Device[] = [hops[0]]
+  for (let i = 1; i < hops.length; i += 1) {
+    const segment = shortestPath(hops[i - 1].id, hops[i].id)
+    if (segment) {
+      // Skip the first element — it is the previous hop already appended.
+      for (let j = 1; j < segment.length; j += 1) expanded.push(segment[j])
+    } else {
+      // No cabled path — fall back to the logical hop so the trace still plays.
+      expanded.push(hops[i])
+    }
+  }
+  return expanded
 }
 
 export function TopologyCanvas() {
@@ -224,20 +290,26 @@ export function TopologyCanvas() {
     }
 
     // Ride the ACTUAL cables: build the polyline from the same connection
-    // points the canvas uses to draw each link, node-center to node-center,
-    // so the dot follows the lines instead of cutting straight chords.
-    const hopCenters = packetTrace.path
+    // points the canvas uses to draw each link. The ping path only reports
+    // routed (L3) hops — switches never appear — so expand every hop pair
+    // over the physical link graph to get the real cable-by-cable route.
+    const hopDevices = packetTrace.path
       .map((hostname) => hostnameMap.get(hostname))
       .filter((device): device is Device => Boolean(device?.position))
-      .map(nodePxCenter)
 
+    const expanded = expandOverLinks(hopDevices, devices, links)
+
+    const hopCenters = expanded.map(nodePxCenter)
+
+    // Build the polyline from the SAME edge endpoints the SVG <line> elements
+    // use — no node centers, so the packet rides the actual cables instead of
+    // cutting diagonally across devices. Each hop contributes its (x1,y1)→(x2,y2)
+    // segment; consecutive hops share the intermediate node, so the packet
+    // passes straight through it from one cable-end to the next.
     const points: Point[] = []
-    if (hopCenters.length >= 2) {
-      points.push(hopCenters[0])
-      for (let i = 1; i < hopCenters.length; i += 1) {
-        const { x1, y1, x2, y2 } = connectionPoints(hopCenters[i - 1], hopCenters[i])
-        points.push({ x: x1, y: y1 }, { x: x2, y: y2 }, hopCenters[i])
-      }
+    for (let i = 1; i < hopCenters.length; i += 1) {
+      const { x1, y1, x2, y2 } = connectionPoints(hopCenters[i - 1], hopCenters[i])
+      points.push({ x: x1, y: y1 }, { x: x2, y: y2 })
     }
 
     if (points.length < 2) {
@@ -267,7 +339,7 @@ export function TopologyCanvas() {
       cleared = true
       cancelAnimationFrame(raf)
     }
-  }, [packetTrace, hostnameMap, clearPacketTrace, size.w, size.h])
+  }, [packetTrace, hostnameMap, devices, links, clearPacketTrace, size.w, size.h])
 
   function handleNodePointerDown(event: React.PointerEvent, device: Device) {
     event.stopPropagation()
