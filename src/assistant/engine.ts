@@ -18,6 +18,7 @@ import {
   handleConcept,
 } from './engine.handlers2'
 import { getSelectedDevice, formatTopologyOverview } from './context'
+import { askLLM } from './llm'
 import { parseCommand } from './parse'
 import type { ParsedCommand } from './parse'
 import type { AssistantMessage } from '@/assistant/types'
@@ -76,21 +77,54 @@ export function handleMessage(raw: string): void {
   store.pushMessage({ id: newId(), role: 'user', kind: 'text', text: trimmed })
   store.setStatus('thinking')
   const labAtSend = store.activeLabId
+
+  /** Stale-run guard shared by every async path below. */
+  const isStale = () => useCopilotStore.getState().activeLabId !== labAtSend
+
+  const finish = () => {
+    const s = useCopilotStore.getState()
+    // Don't clobber the takeover's "working" status when a chat answer finishes.
+    s.setStatus(s.labAssist.busy ? 'working' : 'idle')
+  }
+
+  // Free-form questions that the rule-based engine can't parse are routed to
+  // the LLM (when the /api/assistant key is configured). Everything it returns
+  // is informational only — the LLM can never mutate the simulator. If the
+  // LLM is unavailable (no key, offline, error) we fall back to the local
+  // handler so the copilot always answers.
+  if (parseCommand(trimmed).intent === 'unknown') {
+    window.setTimeout(() => {
+      if (isStale()) return
+      window.setTimeout(async () => {
+        if (isStale()) return
+        const reply = await askLLM(trimmed)
+        if (isStale()) return
+        useCopilotStore.getState().pushMessage(
+          reply
+            ? text(reply)
+            : text("I didn't catch that. I'm best at diagnosing, configuring, or fixing labs." +
+                (getSelectedDevice() ? `\nYou have ${getSelectedDevice()!.hostname} selected — "why is this device not working?" will use it.` : '')),
+        )
+        finish()
+      }, 350)
+    }, 0)
+    return
+  }
+
   window.setTimeout(() => {
     // If the lab changed in the meantime, drop the response — never leak a
     // reply into another lab's conversation.
-    if (useCopilotStore.getState().activeLabId !== labAtSend) return
+    if (isStale()) return
     try {
       for (const reply of respond(trimmed)) useCopilotStore.getState().pushMessage(reply)
     } catch (error) {
       useCopilotStore.getState().pushMessage(text(`[FAIL] ${error instanceof Error ? error.message : String(error)}\nNo configuration changes were made.`))
     } finally {
-      const s = useCopilotStore.getState()
-      // Don't clobber the takeover's "working" status when a chat answer finishes.
-      s.setStatus(s.labAssist.busy ? 'working' : 'idle')
+      finish()
     }
   }, 350)
 }
+
 
 function extractIp(destination: string): string {
   const match = /\((\d{1,3}(?:\.\d{1,3}){3})\)/.exec(destination)
