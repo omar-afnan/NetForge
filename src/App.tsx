@@ -11,6 +11,7 @@ import { TopologyToolbar } from '@/components/topology/TopologyToolbar'
 const NetworkTerminal = lazy(() => import('@/components/terminal/NetworkTerminal').then((m) => ({ default: m.NetworkTerminal })))
 import { SettingsView } from '@/components/settings/SettingsView'
 import { LearnView } from '@/components/learn/LearnView'
+import { DeviceLabView } from '@/components/devicelab/DeviceLabView'
 import { LandingPage } from '@/components/landing/LandingPage'
 import { TakeoverOverlay } from '@/components/assistant/TakeoverOverlay'
 import { useUIStore } from '@/store/uiStore'
@@ -91,6 +92,7 @@ function TopologyView() {
 
 function App() {
   const activeView = useUIStore((s) => s.activeView)
+  const deviceLabLessonOpen = useUIStore((s) => s.deviceLabLessonOpen)
   const glowEffects = useSettingsStore((s) => s.glowEffects)
   const { isSignedIn } = useAuth()
 
@@ -136,6 +138,13 @@ function App() {
       main = <LearnView />
       bottom = undefined
       right = undefined
+      break
+    case 'devicelab':
+      main = <DeviceLabView />
+      bottom = undefined
+      // Inspector/Copilot only make sense inside an open lesson (Ask Copilot
+      // answers render in the right sidebar) — hide it on the home/list pages.
+      right = deviceLabLessonOpen ? right : undefined
       break
     case 'topology':
       main = <TopologyView />

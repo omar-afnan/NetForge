@@ -29,6 +29,34 @@ const FALLBACK_SYSTEM = [
   'what to change instead.',
 ].join('\n')
 
+/**
+ * System prompt for "plan" mode: the AI takeover asks the model to diagnose
+ * the live network and propose machine-applicable fixes. The client validates
+ * every change against a strict whitelist before anything is applied.
+ */
+const PLAN_SYSTEM = [
+  'You are the diagnosis and repair engine of a network simulator teaching app.',
+  'You receive a LIVE snapshot of a simulated network: devices, interfaces, IPs, subnet masks, default gateways, static routes, link status and link ids.',
+  'Diagnose why connectivity tests fail and propose the minimal set of configuration changes that fixes the lab objective.',
+  '',
+  'Rules:',
+  '- Change ONLY what is actually broken. Minimal, targeted fixes.',
+  '- deviceRef MUST be an exact hostname from the snapshot.',
+  '- linkId MUST be an exact id from the snapshot Links list.',
+  '- Respond with ONLY a JSON object, no prose, no markdown fences:',
+  '{"reasoning": "1-3 sentence diagnosis", "changes": [{"kind": "...", "deviceRef": "...", "summary": "...", "detail": "...", "payload": {}}]}',
+  '',
+  'Valid change kinds and their payload fields:',
+  '- "gateway":          payload { "gateway": "a.b.c.d" }',
+  '- "interface":        payload { "interfaceRef": "name", "ip": "a.b.c.d", "mask": "a.b.c.d" }  (or "prefix": 24 instead of "mask")',
+  '- "interface-status": payload { "interfaceRef": "name", "status": "up" | "down" }',
+  '- "route-add":        payload { "destination": "a.b.c.d", "mask": "a.b.c.d" | "prefix": 24, "nextHop": "a.b.c.d" }',
+  '- "route-remove":     payload { "destination": "a.b.c.d", "mask": "a.b.c.d" | "prefix": 24 }',
+  '- "link-status":      payload { "linkId": "from snapshot", "status": "up" | "down" }',
+  '',
+  'If the network is already healthy, return {"reasoning": "...", "changes": []}.',
+].join('\n')
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
@@ -54,8 +82,9 @@ export default async function handler(req, res) {
   }
 
   // Only role/content pairs are forwarded — nothing else from the client.
+  const isPlanMode = body?.mode === 'plan'
   const messages = [
-    { role: 'system', content: body.system || FALLBACK_SYSTEM },
+    { role: 'system', content: isPlanMode ? PLAN_SYSTEM : (body.system || FALLBACK_SYSTEM) },
     ...history
       .filter((m) => (m?.role === 'user' || m?.role === 'assistant') && typeof m?.content === 'string')
       .slice(-12) // keep the prompt small and cheap
@@ -72,8 +101,8 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: process.env.KIMI_MODEL || DEFAULT_MODEL,
         messages,
-        temperature: 0.4,
-        max_tokens: 800,
+        temperature: isPlanMode ? 0 : 0.4,
+        max_tokens: isPlanMode ? 1200 : 800,
       }),
     })
 

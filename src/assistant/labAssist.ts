@@ -5,6 +5,7 @@ import { useUIStore } from '@/store/uiStore'
 import { ping, runConnectivityMatrix } from './tools'
 import { scanLab, formatMatrix } from './diagnose'
 import { executeChange } from './engine.core'
+import { requestLLMPlan } from './llm'
 
 import type { ProposedChange } from './types'
 
@@ -121,7 +122,21 @@ export async function runLabAssist(labId: string) {
   const line = (text: string, tone: 'info' | 'ok' | 'warn' | 'cmd' | 'header' = 'info') =>
     store.pushTakeoverLine(text, tone)
 
-  const { problems, plan, matrix } = scanLab()
+  const initialScan = scanLab()
+  const { problems, matrix } = initialScan
+  let plan = initialScan.plan
+
+  // Consult the LLM first (when KIMI_API_KEY is configured on the server):
+  // it sees the same live state and proposes changes in the same schema —
+  // invalid items are dropped client-side, so nothing unsafe can execute.
+  // If the LLM is unavailable, unconfigured, or returns nothing usable, the
+  // local rule-based planner above is used unchanged.
+  const aiPlan = await requestLLMPlan()
+  if (isStale()) throw STALE
+  if (aiPlan) {
+    plan = aiPlan.changes
+    if (aiPlan.reasoning) push(`🤖 AI diagnosis: ${aiPlan.reasoning}`)
+  }
 
   // Nothing to automate — still give a visible takeover moment.
   if (plan.length === 0) {
@@ -236,9 +251,15 @@ export async function runLabAssist(labId: string) {
     let success = false
 
     // Up to 3 diagnose → apply → verify rounds: after each pass the AI
-    // re-scans the live network, so cascading faults get fixed visibly too.
+    // re-diagnoses the live network (LLM first, local scan as fallback), so
+    // cascading faults get fixed visibly too.
     for (let round = 1; round <= 3; round++) {
-      const scan = round === 1 ? { problems, plan, matrix } : scanLab()
+      let scan = round === 1 ? { problems, plan, matrix } : scanLab()
+      if (round > 1) {
+        const ai = await requestLLMPlan()
+        if (isStale()) throw STALE
+        if (ai) scan = { ...scan, plan: ai.changes }
+      }
       if (scan.plan.length === 0) {
         if (scan.matrix.every((t) => t.success)) {
           success = true
