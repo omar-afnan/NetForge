@@ -165,7 +165,14 @@ export function AICopilotPanel() {
                 setMode('takeover')
                 // The driver owns the assist state (steps, busy flag) -
                 // don't pre-start it here or the busy guard blocks the run.
-                window.setTimeout(() => runLabAssist(lab.id), 0)
+                // .catch() is defense-in-depth: the driver already swallows
+                // its own STALE signals, but we never want an unhandled
+                // rejection from a fire-and-forget takeover.
+                window.setTimeout(() => {
+                  void runLabAssist(lab.id).catch((err) => {
+                    console.warn('Lab assist run rejected:', err)
+                  })
+                }, 0)
               }
             }}
           >

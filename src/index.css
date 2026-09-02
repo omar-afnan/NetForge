@@ -1742,6 +1742,18 @@ body {
   color: var(--text-secondary, #9fb0c3);
 }
 
+/* Partial run: honest, non-celebratory close. */
+.takeover-complete-muted {
+  border-top-color: color-mix(in srgb, var(--status-warn, #fbbf24) 40%, transparent);
+}
+.takeover-complete-muted .takeover-complete-title {
+  color: var(--status-warn, #fbbf24);
+}
+.takeover-complete-muted .takeover-sparkles {
+  animation: none;
+  opacity: 0.5;
+}
+
 .takeover-return {
   margin-top: 8px;
   font-size: 11px;

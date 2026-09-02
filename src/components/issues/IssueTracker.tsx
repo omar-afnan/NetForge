@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
+  FlaskConical,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -70,8 +71,18 @@ export function IssueTracker() {
   const setPacketTrace = useNetworkStore((s) => s.setPacketTrace)
   const setHighlightedDevice = useNetworkStore((s) => s.setHighlightedDevice)
   const completeLab = useNetworkStore((s) => s.completeLab)
+  const completedLabs = useNetworkStore((s) => s.completedLabs)
   const setActiveView = useUIStore((s) => s.setActiveView)
   const copilot = useCopilotStore()
+
+  // The baseline "Competition Lab" and an empty workspace have no fault to
+  // solve, so the whole ticket framing (Active Issue / Resolved / verification)
+  // does not apply to them.
+  const isSandbox = lab.id === 'starter' || lab.id === 'blank' || devices.length === 0
+  // The ONLY trustworthy "this lab is done" signal: a persisted completion
+  // record (written by verification or the AI takeover). Passing pings alone
+  // never flip the ticket to Resolved.
+  const labComplete = !!completedLabs[lab.id]?.completed
 
   const [status, setStatus] = useState<WorkspaceStatus>('investigating')
   const [results, setResults] = useState<ToolResultView[]>([])
@@ -88,6 +99,7 @@ export function IssueTracker() {
   const [scanning, setScanning] = useState(false)
   const investigationCount = useRef(0)
   const strongestAssist = useRef<'None' | 'Hint' | 'Explain' | 'Full Investigation'>('None')
+  const autoVerifiedRef = useRef(false)
 
   // Reset the workspace whenever the active lab changes.
   useEffect(() => {
@@ -103,6 +115,7 @@ export function IssueTracker() {
     setHistory(loadHistory(lab.id))
     investigationCount.current = 0
     strongestAssist.current = 'None'
+    autoVerifiedRef.current = false
   }, [lab.id])
 
   /* ── Live analysis, all derived from real state ─────────────── */
@@ -135,9 +148,23 @@ export function IssueTracker() {
 
   const allPass = matrix.length > 0 && matrix.every((t) => t.success)
 
+  // Resolved is driven by the persisted completion record, never by pings alone
+  // (the baseline lab passes every ping yet has nothing to solve).
   useEffect(() => {
-    if (allPass && status !== 'resolved') setStatus('resolved')
-  }, [allPass, status])
+    if (labComplete) setStatus('resolved')
+  }, [labComplete])
+
+  // A student who fixes the fault straight from the terminal (never clicking
+  // "Apply Fix") still earns the completion: when every connectivity test
+  // passes on a real, not-yet-completed lab, run the real verification once -
+  // that is what writes the completion record and updates the Lab Library.
+  useEffect(() => {
+    if (isSandbox || labComplete || !allPass) return
+    if (autoVerifiedRef.current || busyTool) return
+    autoVerifiedRef.current = true
+    void runVerification()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allPass, isSandbox, labComplete, busyTool])
 
   /* ── Actions - every one drives the REAL simulator/stores ───── */
 
@@ -289,7 +316,9 @@ export function IssueTracker() {
       kind: 'text',
       text: '🤖 Taking over the investigation - watch the live topology overlay. You can keep typing questions here while I work.',
     })
-    void runLabAssist(lab.id)
+    void runLabAssist(lab.id).catch((err) => {
+      console.warn('Lab assist run rejected:', err)
+    })
   }
 
   /* ── Fix + verification - the real lab tests decide ─────────── */
@@ -382,38 +411,93 @@ export function IssueTracker() {
       </div>
 
       <div className="flex-1 space-y-3 overflow-auto p-3">
-        {/* 1 · ACTIVE ISSUE */}
-        <div className="panel border p-4">
-          <div className="flex items-center gap-2">
-            <AlertTriangle
-              className={`h-4 w-4 ${status === 'resolved' ? 'text-[var(--status-up)]' : 'text-[var(--status-warn)]'}`}
-              strokeWidth={1.75}
-            />
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">
-              Active Issue
-            </span>
-            <span className="ml-auto badge difficulty-intermediate">{lab.difficulty}</span>
-            <span className={`badge ${status === 'resolved' ? 'badge-completed' : 'badge-cyan'}`}>
-              {status === 'resolved' ? 'Resolved' : status === 'fixing' ? 'Fixing' : 'Investigating'}
-            </span>
+        {/* 1 · STATUS HEADER — honest three-state ticket, or a sandbox notice */}
+        {isSandbox ? (
+          <div className="panel border p-4">
+            <div className="flex items-center gap-2">
+              <FlaskConical className="h-4 w-4 text-[var(--accent-link)]" strokeWidth={1.75} />
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">
+                {devices.length === 0 ? 'Empty Workspace' : 'Baseline Sandbox'}
+              </span>
+              <span className={`ml-auto badge difficulty-${lab.difficulty}`}>{lab.difficulty}</span>
+              <span className="badge badge-cyan">No Faults</span>
+            </div>
+            <div className="mt-2 text-[12px] leading-relaxed text-[var(--text-secondary)]">
+              {devices.length === 0
+                ? 'No topology loaded. Open the Lab Library and load a lab to start troubleshooting — this workspace only tracks a fault once one exists.'
+                : 'This is the baseline competition topology — every device, link and route is healthy by design. There is no fault to investigate here, so it never counts toward lab completion.'}
+            </div>
+            {devices.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-data text-[10px] text-[var(--text-dim)]">
+                <span className="text-[var(--status-up)]">
+                  {matrix.filter((t) => t.success).length}/{matrix.length}
+                </span>
+                <span>endpoint pairs reachable</span>
+                <span>·</span>
+                <span>0 injected faults</span>
+                <span>·</span>
+                <span>{lab.title}</span>
+              </div>
+            )}
           </div>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="font-data text-[13px] font-semibold text-[var(--text-primary)]">
-              {primaryDevice?.hostname ?? '-'}
-            </span>
-            <span className="text-[12px] text-[var(--text-secondary)]">
-              {status === 'resolved'
-                ? 'All connectivity tests pass.'
-                : failingTest
-                  ? `Cannot reach ${failingTest.destination}`
-                  : (issues[0]?.description ?? 'Audit running…')}
-            </span>
+        ) : (
+          <div className="panel border p-4">
+            <div className="flex items-center gap-2">
+              {status === 'resolved' ? (
+                <CheckCircle2 className="h-4 w-4 text-[var(--status-up)]" strokeWidth={1.75} />
+              ) : status === 'fixing' ? (
+                <Wrench className="h-4 w-4 text-[var(--accent-link)]" strokeWidth={1.75} />
+              ) : (
+                <AlertTriangle className="h-4 w-4 text-[var(--status-warn)]" strokeWidth={1.75} />
+              )}
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">
+                {status === 'resolved' ? 'Resolved Issue' : 'Active Issue'}
+              </span>
+              <span className={`ml-auto badge difficulty-${lab.difficulty}`}>{lab.difficulty}</span>
+              <span className={`badge ${status === 'resolved' ? 'badge-completed' : 'badge-cyan'}`}>
+                {status === 'resolved' ? 'Resolved' : status === 'fixing' ? 'Fixing' : 'Investigating'}
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="font-data text-[13px] font-semibold text-[var(--text-primary)]">
+                {primaryDevice?.hostname ?? failingTest?.source ?? '—'}
+              </span>
+              <span className="text-[12px] text-[var(--text-secondary)]">
+                {status === 'resolved'
+                  ? 'Fault repaired — every connectivity test passes.'
+                  : failingTest
+                    ? `Cannot reach ${failingTest.destination}`
+                    : (issues[0]?.description ?? 'Running audit…')}
+              </span>
+            </div>
+            {/* honest progress meter — no need to hunt through the re-scan log */}
+            <div className="mt-2 flex items-center gap-2">
+              <div className="h-1 flex-1 overflow-hidden bg-[var(--border)]">
+                <div
+                  className={`h-full transition-all ${allPass ? 'bg-[var(--status-up)]' : 'bg-[var(--status-warn)]'}`}
+                  style={{
+                    width: `${matrix.length ? (matrix.filter((t) => t.success).length / matrix.length) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+              <span className="font-data text-[10px] text-[var(--text-dim)]">
+                {matrix.filter((t) => t.success).length}/{matrix.length} paths
+              </span>
+            </div>
+            <div className="mt-1 font-data text-[10px] text-[var(--text-dim)]">
+              {lab.title} · {issues.length} audit finding{issues.length === 1 ? '' : 's'} · detected:{' '}
+              {failingTest ? 'connectivity failure' : (issues[0]?.detectedBy ?? 'config-audit')}
+            </div>
+            {allPass && !labComplete && status !== 'resolved' && (
+              <div className="mt-3 flex items-center gap-2 border border-[var(--status-up)] bg-[rgba(22,163,74,0.08)] px-3 py-2">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-[var(--status-up)]" strokeWidth={1.75} />
+                <span className="text-[11px] text-[var(--text-secondary)]">
+                  Connectivity looks restored — verifying to confirm and close the ticket…
+                </span>
+              </div>
+            )}
           </div>
-          <div className="mt-1 font-data text-[10px] text-[var(--text-dim)]">
-            {lab.title} · {issues.length} audit finding{issues.length === 1 ? '' : 's'} · detected:{' '}
-            {failingTest ? 'connectivity failure' : (issues[0]?.detectedBy ?? 'config-audit')}
-          </div>
-        </div>
+        )}
         {/* 2 · FAILURE POINT + 3 · EVIDENCE */}
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <Section title="Failure Point" icon={Search}>

@@ -1,13 +1,17 @@
 import {
+  AlertTriangle,
   Monitor,
   RefreshCw,
   RotateCcw,
   SlidersHorizontal,
   Terminal,
+  Trash2,
 } from 'lucide-react'
 import { starterLab } from '@/data/labs/starterLab'
 import { useNetworkStore } from '@/store/networkStore'
 import { useSettingsStore } from '@/store/settingsStore'
+import { useDeviceLabStore } from '@/store/deviceLabStore'
+import { useLearnProgress } from '@/store/progressStore'
 
 function SettingSection({
   title,
@@ -200,6 +204,61 @@ export function SettingsView() {
               >
                 <RefreshCw className="h-3 w-3" />
                 Reload
+              </button>
+            </SettingRow>
+            <SettingRow
+              label="Reset all lab progress"
+              description="Clear every lab's completion record. Lab state, settings, and learn progress are kept."
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  if (!window.confirm('Reset progress for all labs? This cannot be undone.')) return
+                  useNetworkStore.getState().resetAllLabs()
+                }}
+                className="btn-primary flex items-center gap-1.5 text-[11px]"
+              >
+                <Trash2 className="h-3 w-3" />
+                Reset labs
+              </button>
+            </SettingRow>
+            <SettingRow
+              label="Reset all progress"
+              description="Wipe every lab completion, every Learn lesson, every Device Lab lesson, and all UI settings. Reloads the page."
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      'This will erase ALL progress (labs, lessons, settings). Continue?',
+                    )
+                  )
+                    return
+                  // Wipe every known NetForge localStorage key. We touch the keys
+                  // directly (not just the stores) so a future read on a freshly
+                  // loaded page can never restore stale data.
+                  try {
+                    localStorage.removeItem('netforge-network')
+                    localStorage.removeItem('netforge-lab-progress')
+                    localStorage.removeItem('netforge-device-lab')
+                    localStorage.removeItem('netforge-learn-progress')
+                    localStorage.removeItem('netforge-settings')
+                  } catch {
+                    // ignore quota / private-mode errors
+                  }
+                  // Reset in-memory store state too so the next page load isn't
+                  // briefly backed by stale objects before localStorage is read.
+                  useNetworkStore.getState().resetAllLabs()
+                  useLearnProgress.getState().resetProgress()
+                  useDeviceLabStore.getState().resetAll()
+                  useSettingsStore.getState().resetSettings()
+                  window.location.reload()
+                }}
+                className="flex items-center gap-1.5 border border-[var(--accent-amber)] bg-[var(--accent-amber)]/10 px-3 py-1.5 text-[11px] font-medium text-[var(--accent-amber)] transition-colors hover:bg-[var(--accent-amber)]/20"
+              >
+                <AlertTriangle className="h-3 w-3" />
+                Reset everything
               </button>
             </SettingRow>
           </SettingSection>

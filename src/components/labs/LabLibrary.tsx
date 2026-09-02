@@ -36,7 +36,9 @@ export function LabLibrary() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    {progress?.completed ? (
+                    {lab.id === 'starter' ? (
+                      <FlaskConical className="h-3.5 w-3.5 text-[var(--accent-link)]" strokeWidth={1.75} />
+                    ) : progress?.completed ? (
                       <CheckCircle2 className="h-3.5 w-3.5 text-[var(--status-up)]" strokeWidth={1.75} />
                     ) : (
                       <FlaskConical className="h-3.5 w-3.5 text-[var(--accent-link)]" strokeWidth={1.75} />
@@ -44,23 +46,29 @@ export function LabLibrary() {
                     <span className="text-[13px] font-semibold text-[var(--text-primary)]">{lab.title}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    {progress?.completed && (
+                    {lab.id === 'starter' ? (
+                      <span className="badge badge-cyan">Baseline</span>
+                    ) : progress?.completed ? (
                       <span className="badge badge-completed">Completed</span>
-                    )}
+                    ) : null}
                     <span className={`badge difficulty-${lab.difficulty}`}>{lab.difficulty}</span>
                   </div>
                 </div>
 
                 <div className="mt-1 font-data text-[10px] text-[var(--text-dim)]">
-                  {lab.id} · {lab.issueCount} injected {lab.issueCount === 1 ? 'fault' : 'faults'}
+                  {lab.id} · {lab.id === 'starter' ? 'sandbox baseline' : `${lab.issueCount} injected ${lab.issueCount === 1 ? 'fault' : 'faults'}`}
                 </div>
 
-                {progress?.completed && (
+                {lab.id === 'starter' ? (
+                  <div className="mt-1 font-data text-[10px] text-[var(--text-dim)]">
+                    Baseline sandbox — no faults injected.
+                  </div>
+                ) : progress?.completed ? (
                   <div className="mt-1 font-data text-[10px] text-[var(--status-up)]">
                     ✓ Completed {progress.completedAt ? new Date(progress.completedAt).toLocaleDateString() : ''}
                     {progress.aiAssisted ? ' · AI assisted' : ''}
                   </div>
-                )}
+                ) : null}
 
                 <p className="mt-2 flex-1 text-[11px] leading-relaxed text-[var(--text-secondary)]">
                   {lab.description}

@@ -59,7 +59,13 @@ export function handleCompleteLab(): AssistantMessage[] {
   const labId = netStore.lab.id
   if (netStore.lab.devices.length > 0) {
     useCopilotStore.getState().setMode('takeover')
-    window.setTimeout(() => runLabAssist(labId), 0)
+    // Defense-in-depth: runLabAssist already swallows its own STALE signals,
+    // but never let an unhandled rejection escape a fire-and-forget trigger.
+    window.setTimeout(() => {
+      void runLabAssist(labId).catch((err) => {
+        console.warn('Lab assist run rejected:', err)
+      })
+    }, 0)
     return [text(`Starting Lab Assist Mode for ${netStore.lab.title}. I'll investigate step by step and explain everything.`)]
   }
   const { problems, plan, matrix } = scanLab()

@@ -40,7 +40,18 @@ function loadLabProgress(): Record<string, { completed: boolean; completedAt: st
   try {
     const raw = localStorage.getItem(LAB_PROGRESS_KEY)
     if (!raw) return {}
-    return JSON.parse(raw)
+    const parsed = JSON.parse(raw) as Record<string, { completed: boolean; completedAt: string; attempts: number; hintsUsed: number; aiAssisted: boolean }>
+    // The starter lab is a baseline/sandbox — it was never supposed to be tracked.
+    // Scrub any legacy entry so old saved data doesn't show a "Completed" badge.
+    if (parsed && typeof parsed === 'object' && 'starter' in parsed) {
+      delete parsed.starter
+      try {
+        localStorage.setItem(LAB_PROGRESS_KEY, JSON.stringify(parsed))
+      } catch {
+        // ignore quota errors
+      }
+    }
+    return parsed ?? {}
   } catch {
     return {}
   }
@@ -115,6 +126,7 @@ interface NetworkState {
   setHighlightedDevice: (deviceId: string | null) => void
   completeLab: (labId: string, aiAssisted: boolean) => void
   resetLabProgress: (labId: string) => void
+  resetAllLabs: () => void
 }
 
 function createSimulator(devices: Device[], links: NetworkLink[]) {
@@ -540,7 +552,10 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
 
   clearPackets: () => set({ packets: [] }),
   setHighlightedDevice: (deviceId) => set({ highlightedDeviceId: deviceId }),
-    completeLab: (labId, aiAssisted) => {
+  completeLab: (labId, aiAssisted) => {
+    // The starter lab (id: 'starter') is a baseline/sandbox with 0 injected faults.
+    // It has nothing to "solve", so we never mark it complete or persist progress for it.
+    if (labId === 'starter') return
     const progress = { ...get().completedLabs }
     const firstCompletion = !progress[labId]?.completed
     const completedAt = new Date().toISOString()
@@ -566,6 +581,16 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
     delete progress[labId]
     set({ completedLabs: progress })
     persistLabProgress(progress)
+  },
+
+  /** Wipe the completion record for every lab. Useful for a full reset. */
+  resetAllLabs: () => {
+    set({ completedLabs: {} })
+    try {
+      localStorage.removeItem(LAB_PROGRESS_KEY)
+    } catch {
+      // ignore
+    }
   },
   }
 })

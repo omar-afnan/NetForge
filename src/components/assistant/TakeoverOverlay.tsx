@@ -32,8 +32,43 @@ export function TakeoverOverlay() {
   const phase = useCopilotStore((s) => s.labAssist.phase)
   const feed = useCopilotStore((s) => s.labAssist.feed)
   const summary = useCopilotStore((s) => s.labAssist.summary)
+  const outcome = useCopilotStore((s) => s.labAssist.outcome)
   const setTakeoverPhase = useCopilotStore((s) => s.setTakeoverPhase)
   const stopLabAssist = useCopilotStore((s) => s.stopLabAssist)
+
+  // Only a genuine, fully-verified solve celebrates and returns to the Library.
+  // A partial run resolves honestly (amber, routes to Issues) instead.
+  const muted = outcome === 'partial'
+  const finalScreen =
+    outcome === 'partial'
+      ? {
+          badge: 'INCOMPLETE',
+          badgeOk: false,
+          sparkles: '— · —',
+          title: 'PARTIALLY SOLVED',
+          sub: 'Some connectivity tests are still failing. Open the Issues workspace to finish up.',
+          returnText: 'Returning to the Issues workspace…',
+          view: 'issues' as const,
+        }
+      : outcome === 'noop'
+        ? {
+            badge: 'NO FAULTS',
+            badgeOk: true,
+            sparkles: '✓',
+            title: 'NOTHING TO FIX',
+            sub: 'This is the baseline sandbox — every path is already healthy.',
+            returnText: 'Returning to the topology…',
+            view: 'topology' as const,
+          }
+        : {
+            badge: 'DONE',
+            badgeOk: true,
+            sparkles: '✨ ⭐ ✨',
+            title: 'LAB COMPLETED',
+            sub: 'AI successfully solved the networking problem.',
+            returnText: 'Returning to Lab Library…',
+            view: 'labs' as const,
+          }
 
   const [typed, setTyped] = useState('')
   const [showReturn, setShowReturn] = useState(false)
@@ -63,20 +98,20 @@ export function TakeoverOverlay() {
     return () => window.clearInterval(timer)
   }, [phase, summary, setTakeoverPhase])
 
-  // Completion moment → "Returning to Lab Library..." → redirect.
+  // Completion moment → "Returning…" → redirect (target depends on outcome).
   useEffect(() => {
     if (phase !== 'complete') return
     setShowReturn(false)
     const t1 = window.setTimeout(() => setShowReturn(true), 1400)
     const t2 = window.setTimeout(() => {
-      useUIStore.getState().setActiveView('labs')
+      useUIStore.getState().setActiveView(finalScreen.view)
       stopLabAssist()
     }, 3400)
     return () => {
       window.clearTimeout(t1)
       window.clearTimeout(t2)
     }
-  }, [phase, stopLabAssist])
+  }, [phase, stopLabAssist, finalScreen.view])
 
   if (!visible) return null
 
@@ -86,7 +121,11 @@ export function TakeoverOverlay() {
         <div className="takeover-title">
           <span className="takeover-bot">🤖</span> AI TAKEOVER
           {phase === 'working' && <span className="takeover-badge">WORKING…</span>}
-          {phase === 'complete' && <span className="takeover-badge takeover-badge-ok">DONE</span>}
+          {phase === 'complete' && (
+            <span className={`takeover-badge${finalScreen.badgeOk ? ' takeover-badge-ok' : ''}`}>
+              {finalScreen.badge}
+            </span>
+          )}
         </div>
 
         {phase === 'working' && (
@@ -110,11 +149,11 @@ export function TakeoverOverlay() {
         )}
 
         {phase === 'complete' && (
-          <div className="takeover-complete">
-            <div className="takeover-sparkles">✨ ⭐ ✨</div>
-            <div className="takeover-complete-title">LAB COMPLETED</div>
-            <div className="takeover-complete-sub">AI successfully solved the networking problem.</div>
-            {showReturn && <div className="takeover-return">Returning to Lab Library…</div>}
+          <div className={`takeover-complete${muted ? ' takeover-complete-muted' : ''}`}>
+            <div className="takeover-sparkles">{finalScreen.sparkles}</div>
+            <div className="takeover-complete-title">{finalScreen.title}</div>
+            <div className="takeover-complete-sub">{finalScreen.sub}</div>
+            {showReturn && <div className="takeover-return">{finalScreen.returnText}</div>}
           </div>
         )}
       </div>

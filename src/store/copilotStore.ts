@@ -14,6 +14,15 @@ export interface AssistStep {
 
 export type TakeoverPhase = 'idle' | 'working' | 'summary' | 'complete'
 export type TakeoverTone = 'info' | 'ok' | 'warn' | 'cmd' | 'header'
+/**
+ * How a takeover run ended. The overlay's final screen and the post-run
+ * redirect both key off this, so a run that could NOT fully solve the lab
+ * never shows a "LAB COMPLETED" celebration or updates the Lab Library.
+ *  - success: every connectivity test passes, lab marked complete
+ *  - partial: ran out of safe fixes, some tests still failing
+ *  - noop:    nothing to fix (baseline sandbox / already healthy)
+ */
+export type TakeoverOutcome = 'success' | 'partial' | 'noop' | null
 
 export interface TakeoverLine {
   id: string
@@ -33,6 +42,8 @@ export interface LabAssistState {
   feed: TakeoverLine[]
   /** Plain-English summary the AI types out after solving the lab. */
   summary: string | null
+  /** How the run ended - drives the overlay's final screen (see TakeoverOutcome). */
+  outcome: TakeoverOutcome
 }
 
 const DEFAULT_ASSIST: LabAssistState = {
@@ -45,6 +56,7 @@ const DEFAULT_ASSIST: LabAssistState = {
   phase: 'idle',
   feed: [],
   summary: null,
+  outcome: null,
 }
 
 const GREETING: AssistantMessage = {
@@ -90,6 +102,7 @@ interface CopilotState {
   setTakeoverPhase: (phase: TakeoverPhase) => void
   pushTakeoverLine: (text: string, tone?: TakeoverTone) => void
   setTakeoverSummary: (summary: string | null) => void
+  setTakeoverOutcome: (outcome: TakeoverOutcome) => void
   stopLabAssist: () => void
   clearChat: () => void
 }
@@ -166,6 +179,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
       },
     })),
   setTakeoverSummary: (summary) => set((state) => ({ labAssist: { ...state.labAssist, summary } })),
+  setTakeoverOutcome: (outcome) => set((state) => ({ labAssist: { ...state.labAssist, outcome } })),
   stopLabAssist: () => set({ labAssist: DEFAULT_ASSIST }),
   clearChat: () => set((state) => {
     const labId = state.activeLabId ?? 'default'

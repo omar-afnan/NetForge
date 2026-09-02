@@ -118,6 +118,15 @@ export async function runLabAssist(labId: string) {
   // All waits below abort the run the moment the lab changes or assist is exited.
   const delay = async (ms: number) => pause(ms, isStale)
 
+  // Claim the assist state SYNCHRONOUSLY, before the first await. The stale
+  // guard treats `labAssist.labId !== labId` as stale, so until the assist
+  // state is claimed every isStale() check would wrongly report stale and the
+  // takeover would abort itself right after the first await (the "button does
+  // nothing" bug). Claiming here also arms the busy flag, so double triggers
+  // are rejected by the guard above. Real steps are filled in once the plan
+  // is known (setLabAssistSteps below).
+  store.startLabAssist(labId, [])
+
   // Nothing broken yet.
   const line = (text: string, tone: 'info' | 'ok' | 'warn' | 'cmd' | 'header' = 'info') =>
     store.pushTakeoverLine(text, tone)
@@ -126,6 +135,12 @@ export async function runLabAssist(labId: string) {
   const { problems, matrix } = initialScan
   let plan = initialScan.plan
 
+  // The whole run is guarded: `STALE` can be thrown from anywhere below (the
+  // LLM await, the inspection loop, the apply/verify rounds). Without this
+  // outer guard those throws escape as unhandled promise rejections at the
+  // fire-and-forget call sites and surface in the console as
+  // "Uncaught (in promise) Symbol(lab-assist-stale)".
+  try {
   // Consult the LLM first (when KIMI_API_KEY is configured on the server):
   // it sees the same live state and proposes changes in the same schema -
   // invalid items are dropped client-side, so nothing unsafe can execute.
@@ -140,31 +155,57 @@ export async function runLabAssist(labId: string) {
 
   // Nothing to automate - still give a visible takeover moment.
   if (plan.length === 0) {
-    store.startLabAssist(labId, [])
     store.setTakeoverPhase('working')
     line('🤖 AI TAKEOVER', 'header')
     await delay(600)
     line('Analyzing the network...')
     await delay(800)
     const allPass = matrix.every((t) => t.success)
+    // A lab with no injected fault (the "Competition Lab" baseline / an empty
+    // workspace) has nothing to solve - never claim a completion for it.
+    const noFaults = lab.id === 'starter' || (lab.failures?.length ?? 0) === 0
     if (allPass) {
       line('✓ Topology identified', 'ok')
       await delay(400)
       line('Running connectivity tests...')
       await delay(800)
-      line('✓ All tests passing - nothing to fix', 'ok')
-      store.setTakeoverSummary(
-        `I analyzed "${lab.title}" and everything is already healthy -\nall connectivity tests pass. Nothing needed fixing.\n\n✓ Lab objective completed`,
-      )
+      line('✓ All connectivity tests passing', 'ok')
+      await delay(300)
+      if (noFaults) {
+        line('This lab has no injected fault - nothing to repair', 'info')
+        store.setTakeoverOutcome('noop')
+        store.setTakeoverSummary(
+          `I analyzed "${lab.title}" - this is the baseline sandbox.\nEvery connectivity test already passes, so there is\nnothing here to fix.\n\nLoad a lab from the Library to start troubleshooting.`,
+        )
+      } else {
+        line('✓ Lab objective already met', 'ok')
+        store.setTakeoverOutcome('success')
+        store.setTakeoverSummary(
+          `I analyzed "${lab.title}" and every connectivity test\nalready passes. The lab objective is met.\n\n✓ Lab objective completed`,
+        )
+        net.completeLab(labId, true)
+      }
       store.setTakeoverPhase('summary')
-      net.completeLab(labId, true)
       return
     }
     await delay(400)
     line('⚠ Found issues I can\'t safely automate', 'warn')
     await delay(600)
-    store.setTakeoverPhase('idle')
-    store.stopLabAssist()
+    // Land on an honest "partial" summary - NOT a silent drop back to idle,
+    // which left the overlay to vanish with no explanation.
+    store.setTakeoverOutcome('partial')
+    store.setTakeoverSummary(
+      [
+        `I checked "${lab.title}" but couldn't find safe automatic fixes.`,
+        '',
+        ...problems.slice(0, 4).map((p) => `• ${p.summary}`),
+        '',
+        `These likely need manual topology changes (cabling, new`,
+        `devices). Ask me "why can't PC-01 ping SRV-01?" for a`,
+        `step-by-step walkthrough.`,
+      ].join('\n'),
+    )
+    store.setTakeoverPhase('summary')
     push(
       [
         `I checked \"${lab.title}\" - here's what I found:`,
@@ -191,7 +232,7 @@ export async function runLabAssist(labId: string) {
     { id: 'verify', label: 'Verifying connectivity', detail: 'Re-running every test', status: 'pending' },
   ]
 
-  store.startLabAssist(labId, steps)
+  store.setLabAssistSteps(steps)
   store.setTakeoverPhase('working') // make the live takeover overlay visible
   store.setStatus('working')
 
@@ -206,7 +247,6 @@ export async function runLabAssist(labId: string) {
 
   const markAllDone = () => setSteps(steps.map((s) => ({ ...s, status: 'done' })))
 
-  try {
     // ---- Live takeover sequence on the real lab UI ----
     useUIStore.getState().setActiveView('topology')
     await delay(700)
@@ -250,10 +290,11 @@ export async function runLabAssist(labId: string) {
     let matrixAfter = matrix
     let success = false
 
-    // Up to 3 diagnose → apply → verify rounds: after each pass the AI
+    // Up to MAX_ROUNDS diagnose → apply → verify passes: after each one the AI
     // re-diagnoses the live network (LLM first, local scan as fallback), so
-    // cascading faults get fixed visibly too.
-    for (let round = 1; round <= 3; round++) {
+    // cascading / multi-fault labs get fixed visibly too.
+    const MAX_ROUNDS = 4
+    for (let round = 1; round <= MAX_ROUNDS; round++) {
       let scan = round === 1 ? { problems, plan, matrix } : scanLab()
       if (round > 1) {
         const ai = await requestLLMPlan()
@@ -314,7 +355,7 @@ export async function runLabAssist(labId: string) {
       success = true
       break
     }
-    if (round < 3) {
+    if (round < MAX_ROUNDS) {
       line(`⚠ ${passing}/${matrixAfter.length} tests passing - re-diagnosing...`, 'warn')
       await delay(800)
     }
@@ -341,6 +382,7 @@ export async function runLabAssist(labId: string) {
 
       // Keep the takeover phase at 'summary' so the overlay typewrites the
       // explanation, then the overlay itself moves to 'complete' and redirects.
+      store.setTakeoverOutcome('success')
       net.completeLab(labId, true)
       push(`✅ Verification passed - all ${matrixAfter.length} connectivity tests are green.\n\n${formatMatrix(matrixAfter)}`)
       store.setTakeoverSummary(
@@ -363,8 +405,22 @@ export async function runLabAssist(labId: string) {
       const passingNow = matrixAfter.filter((t) => t.success).length
       line(`⚠ ${passingNow}/${matrixAfter.length} tests passing`, 'warn')
       await delay(600)
-      store.setTakeoverPhase('idle')
-      store.stopLabAssist()
+      // Honest "partial" close: type out what happened and route the student to
+      // the Issues workspace - never silently drop the overlay back to idle.
+      store.setTakeoverOutcome('partial')
+      store.setTakeoverSummary(
+        [
+          `I got ${passingNow}/${matrixAfter.length} connectivity tests passing on`,
+          `"${lab.title}", then ran out of safe automatic fixes.`,
+          '',
+          ...(applied.length
+            ? applied.slice(0, 5).map((c) => `✅ ${c.summary}`)
+            : ['Nothing could be safely automated.']),
+          '',
+          `Open the Issues workspace to finish the last steps by hand.`,
+        ].join('\n'),
+      )
+      store.setTakeoverPhase('summary')
       push(
         [
           `I dug into "${lab.title}" and got ${passingNow}/${matrixAfter.length} tests passing, but ran out of safe automatic fixes.`,

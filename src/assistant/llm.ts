@@ -13,6 +13,22 @@ import { useNetworkStore } from '@/store/networkStore'
 import type { AssistantMessage } from './types'
 import type { ProposedChange } from './types'
 
+/**
+ * Serverless function calls can hang on cold starts or if the backend
+ * misbehaves - an unbounded `fetch` would leave the copilot stuck on
+ * "Thinking…" forever (input disabled, no escape). Bound every round-trip so a
+ * slow/unresponsive backend falls back to the local rule-based engine instead.
+ */
+const LLM_TIMEOUT_MS = 10000
+
+function fetchWithTimeout(input: string, init: RequestInit, timeoutMs = LLM_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs)
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => {
+    window.clearTimeout(timer)
+  })
+}
+
 export function buildSystemPrompt(): string {
   const lines = [
     'You are NetForge Copilot, a friendly networking tutor embedded in a network simulator app used by students.',
@@ -49,7 +65,7 @@ export async function askLLM(userText: string): Promise<string | null> {
     const history = toChatHistory(useCopilotStore.getState().messages)
     history.push({ role: 'user', content: userText })
 
-    const response = await fetch('/api/assistant', {
+    const response = await fetchWithTimeout('/api/assistant', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ system: buildSystemPrompt(), messages: history }),
@@ -60,6 +76,8 @@ export async function askLLM(userText: string): Promise<string | null> {
     if (data.fallback || typeof data.reply !== 'string' || !data.reply) return null
     return data.reply
   } catch {
+    // Includes AbortError on timeout → fall back to the local engine so the
+    // chat never freezes waiting on a slow or unresponsive backend.
     return null
   }
 }
@@ -70,7 +88,7 @@ export async function askLLM(userText: string): Promise<string | null> {
  */
 export async function llmConfigured(): Promise<boolean> {
   try {
-    const response = await fetch('/api/assistant', {
+    const response = await fetchWithTimeout('/api/assistant', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages: [{ role: 'user', content: 'ping' }] }),
@@ -216,7 +234,7 @@ function sanitizeChanges(raw: unknown): ProposedChange[] {
  */
 export async function requestLLMPlan(): Promise<LLMPlan | null> {
   try {
-    const response = await fetch('/api/assistant', {
+    const response = await fetchWithTimeout('/api/assistant', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
