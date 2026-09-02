@@ -10,6 +10,7 @@ import type { LessonCheckCtx } from '@/devicelab/lessons'
 import type { CliDevice, EndpointDevice } from '@/devicelab/cli'
 import { celebrateLab } from '@/lib/celebrate'
 import { handleMessage } from '@/assistant/engine'
+import { VideoContent } from '@/components/common/VideoContent'
 
 const COURSE_ICONS = { router: Network, switch: Cpu, server: Server, pc: Monitor } as const
 
@@ -28,7 +29,7 @@ function ProgressBar({ done, total }: { done: number; total: number }) {
 function HomePage({ onOpen }: { onOpen: (kind: DeviceKind) => void }) {
   const progress = useDeviceLabStore((s) => s.progress)
   return (
-    <div className="flex h-full flex-col overflow-auto">
+    <div className="view-enter flex h-full flex-col overflow-auto">
       <div className="panel-header">Device Lab</div>
       <div className="mx-auto w-full max-w-4xl p-3">
         <h1 className="text-base font-bold text-[var(--text-primary)]">Learn how real network devices are configured.</h1>
@@ -45,7 +46,7 @@ function HomePage({ onOpen }: { onOpen: (kind: DeviceKind) => void }) {
                 key={course.kind}
                 type="button"
                 onClick={() => onOpen(course.kind)}
-                className="group rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] p-3 text-left transition-all hover:border-[var(--accent-link)] hover:shadow-sm"
+                className="lesson-card hover-lift group rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] p-3 text-left transition-all hover:border-[var(--accent-link)] hover:shadow-sm"
               >
                 <div className="flex items-center gap-2.5">
                   <div className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-bright)] bg-[var(--bg-inset)]">
@@ -78,7 +79,7 @@ function LessonListPage({ kind, onBack, onOpen, onExplore }: { kind: DeviceKind;
   let lockedEncountered = false
 
   return (
-    <div className="flex h-full flex-col overflow-auto">
+    <div className="view-slide-enter flex h-full flex-col overflow-auto">
       <div className="panel-header flex items-center gap-2">
         <button type="button" onClick={onBack} className="flex items-center text-[var(--text-secondary)] hover:text-[var(--text-primary)]" aria-label="Back to Device Lab">
           <ChevronLeft className="h-4 w-4" />
@@ -123,7 +124,7 @@ function LessonListPage({ kind, onBack, onOpen, onExplore }: { kind: DeviceKind;
                     type="button"
                     disabled={locked}
                     onClick={() => onOpen(lesson.id)}
-                    className={`flex w-full items-center gap-2.5 border-b border-[var(--border)] px-3 py-2.5 text-left last:border-b-0 transition-colors ${
+                    className={`lesson-card flex w-full items-center gap-2.5 border-b border-[var(--border)] px-3 py-2.5 text-left last:border-b-0 transition-colors ${
                       locked ? 'cursor-not-allowed opacity-40' : 'hover:bg-[var(--bg-elevated)]'
                     }`}
                   >
@@ -353,7 +354,14 @@ function ConnectivityPanel({ kind, pingDest, setPingDest, lastPing, setLastPing,
         />
         <button
           type="button"
-          onClick={() => setLastPing(pingEndpoint(kind, pingDest.trim()))}
+          onClick={() => {
+            const result = pingEndpoint(kind, pingDest.trim())
+            setLastPing(result)
+            // Play a synthesised audio cue so the user gets feedback even when
+            // they are looking at the canvas, not the panel.
+            if (result.ok) import('@/lib/audioEngine').then(m => m.playPingSuccess())
+            else            import('@/lib/audioEngine').then(m => m.playPingFailure())
+          }}
           className="shrink-0 rounded-md border border-[var(--border-bright)] px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
         >
           Run Ping
@@ -418,6 +426,7 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
   const [feedback, setFeedback] = useState<string | null>(null)
   const [completed, setCompleted] = useState(false)
   const [inspected, setInspected] = useState(false)
+  const [videoOpen, setVideoOpen] = useState(false)
   const lastPingRef = useRef<{ ok: boolean; destination: string; detail: string } | undefined>(undefined)
   const setupRef = useRef<string | null>(null)
 
@@ -458,6 +467,10 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
       if (!completed) {
         store.completeLesson(kind, lessonId)
         celebrateLab()
+        // Audio fanfare for the "task complete" moment — a subtle but distinctive
+        // cue so completion feels rewarding even with the screen reader / focus
+        // on the device panel.
+        import('@/lib/audioEngine').then(m => m.playTaskComplete())
       }
       setCompleted(true)
       setFeedback(null)
@@ -496,7 +509,7 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
         {/* LEFT - instructions */}
-        <div className="min-h-0 overflow-auto border-r border-[var(--border)] p-3">
+        <div className="lesson-panel-left min-h-0 overflow-auto border-r border-[var(--border)] p-3">
           <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Lesson</div>
           <h2 className="mt-0.5 text-[15px] font-bold text-[var(--text-primary)]">{lesson.title}</h2>
           <p className="mt-0.5 text-[12px] leading-snug text-[var(--text-secondary)]">{lesson.description}</p>
@@ -540,7 +553,7 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
           )}
 
           {completed ? (
-            <div className="mt-3 rounded-md border border-[var(--status-up)]/50 bg-[var(--status-up)]/10 p-3">
+            <div className="task-complete-badge mt-3 rounded-md border border-[var(--status-up)]/50 bg-[var(--status-up)]/10 p-3">
               <div className="text-[12px] font-bold text-[var(--status-up)]">✓ Task completed</div>
               <p className="mt-0.5 text-[11.5px] leading-snug text-[var(--text-secondary)]">The simulated device state genuinely passes this lesson's checks.</p>
               {next && (
@@ -575,6 +588,18 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
               <button type="button" onClick={askCopilot} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-[11.5px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
                 Ask Copilot
               </button>
+              <button
+                type="button"
+                onClick={() => setVideoOpen((v) => !v)}
+                className={`rounded-md border px-3 py-1.5 text-[11.5px] transition-colors ${
+                  videoOpen
+                    ? 'border-[var(--accent-link)] bg-[var(--accent-link)]/10 text-[var(--accent-link)]'
+                    : 'border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+                aria-expanded={videoOpen}
+              >
+                {videoOpen ? 'Hide walkthrough' : 'Watch concept'}
+              </button>
               <button type="button" onClick={hardReset} className="ml-auto rounded-md border border-[var(--border)] px-2.5 py-1.5 text-[10.5px] text-[var(--text-dim)] hover:text-[var(--text-secondary)]">
                 Reset device
               </button>
@@ -583,11 +608,37 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
         </div>
 
         {/* RIGHT - the interactive device */}
-        <div className="flex min-h-0 flex-col gap-2 p-3">
+        <div className="lesson-panel-right flex min-h-0 flex-col gap-2 p-3">
           {kind === 'router' && <CliDevicePanel kind="router" device={device as CliDevice} />}
           {kind === 'switch' && <CliDevicePanel kind="switch" device={device as CliDevice} />}
           {(kind === 'server' || kind === 'pc') && (
             <EndpointPanel kind={kind} device={device as EndpointDevice} onInspected={() => setInspected(true)} />
+          )}
+          {videoOpen && (
+            <div className="video-panel-enter mt-1">
+              <VideoContent
+                title={`${course.title}: ${lesson.title}`}
+                description={lesson.objective}
+                scenes={[
+                  {
+                    id: 'concept',
+                    label: 'Concept',
+                    content: lesson.description,
+                  },
+                  {
+                    id: 'task',
+                    label: 'Your task',
+                    content: lesson.objective,
+                  },
+                  {
+                    id: 'hint',
+                    label: 'Hint',
+                    content: lesson.hint,
+                  },
+                ]}
+                onClose={() => setVideoOpen(false)}
+              />
+            </div>
           )}
         </div>
       </div>
@@ -614,13 +665,20 @@ export function DeviceLabView() {
 
   // Deep-link support: Learn's "Try in Device Lab" opens the lab directly at the
   // matching lesson instead of the course home page.
+  // Consume the deep-link exactly once: clear it BEFORE setting state so a
+  // re-render cannot re-fire the same navigation. This was a real bug — the
+  // previous effect could run twice during the same render pass when both
+  // `pending` and `clearPending` were in the deps, briefly leaving the user
+  // trapped inside the same lesson.
   useEffect(() => {
     if (pending) {
-      setOpenKind(pending.kind)
-      setOpenLessonId(pending.lessonId)
+      const { kind, lessonId } = pending
       clearPending()
+      setOpenKind(kind)
+      setOpenLessonId(lessonId)
     }
-  }, [pending, clearPending])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // The right sidebar (Inspector / AI Copilot) is only useful while a lesson
   // with the interactive device is open - "Ask Copilot" answers render there.

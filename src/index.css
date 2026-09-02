@@ -1428,6 +1428,165 @@ body {
   50% { stroke-opacity: 0.4; }
 }
 
+.view-enter       { animation: viewFadeIn  0.25s ease-out both; }
+/* NetForge animations: views, panels, terminal, status, hover. */
+
+@keyframes viewSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes viewFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes panelSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes panelSlideRight {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes lessonCardIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+@keyframes statusGlow {
+  0%, 100% { box-shadow: 0 0 4px 1px var(--glow-color, rgba(22, 163, 74, 0.4)); }
+  50%       { box-shadow: 0 0 10px 3px var(--glow-color, rgba(22, 163, 74, 0.6)); }
+}
+
+@keyframes thinkingDot {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40%            { transform: scale(1.0); opacity: 1; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+@keyframes taskCompleteScale {
+  0%   { transform: scale(0.8); opacity: 0; }
+  60%  { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes issueSlideIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes nodePopIn {
+  from { opacity: 0; transform: scale(0.5); }
+  70%  { transform: scale(1.1); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes packetFloat {
+  0%   { opacity: 0; transform: translateX(-8px) scale(0.8); }
+  20%  { opacity: 1; transform: translateX(0) scale(1); }
+  80%  { opacity: 1; transform: translateX(100%) scale(1); }
+  100% { opacity: 0; transform: translateX(108%) scale(0.8); }
+}
+
+@keyframes bubbleInLeft {
+  from { opacity: 0; transform: translateX(-10px) scale(0.95); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes bubbleInRight {
+  from { opacity: 0; transform: translateX(10px) scale(0.95); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes typingCursor {
+  0%, 49% { opacity: 1; }
+  50%, 100%{ opacity: 0; }
+}
+
+@keyframes outputReveal {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.lesson-card:nth-child(1)  { animation: lessonCardIn 0.30s ease-out 0.00s both; }
+.lesson-card:nth-child(2)  { animation: lessonCardIn 0.30s ease-out 0.06s both; }
+.lesson-card:nth-child(3)  { animation: lessonCardIn 0.30s ease-out 0.12s both; }
+.lesson-card:nth-child(4)  { animation: lessonCardIn 0.30s ease-out 0.18s both; }
+.lesson-card:nth-child(5)  { animation: lessonCardIn 0.30s ease-out 0.24s both; }
+.lesson-card:nth-child(6)  { animation: lessonCardIn 0.30s ease-out 0.30s both; }
+.lesson-card:nth-child(7)  { animation: lessonCardIn 0.30s ease-out 0.36s both; }
+.lesson-card:nth-child(8)  { animation: lessonCardIn 0.30s ease-out 0.42s both; }
+.lesson-card:nth-child(n+9){ animation: lessonCardIn 0.30s ease-out 0.48s both; }
+
+.lesson-panel-left  { animation: panelSlideRight 0.30s ease-out both; }
+.lesson-panel-right { animation: panelSlideUp    0.35s ease-out 0.08s both; }
+
+.hover-lift { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.hover-lift:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08); }
+.hover-scale { transition: transform 0.12s ease; }
+.hover-scale:hover { transform: scale(1.03); }
+.hover-glow { transition: box-shadow 0.2s ease; }
+.hover-glow:hover { box-shadow: 0 0 12px rgba(37, 99, 235, 0.2); }
+
+.status-dot-active  { animation: statusPulse 2.4s ease-in-out infinite; }
+.link-active-glow {
+  animation: statusGlow 2s ease-in-out infinite;
+  --glow-color: rgba(37, 99, 235, 0.5);
+}
+.task-complete-badge { animation: taskCompleteScale 0.40s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.view-enter          { animation: viewFadeIn  0.25s ease-out both; }
+.view-slide-enter    { animation: viewSlideIn 0.30s ease-out both; }
+
+.issue-item { animation: issueSlideIn 0.25s ease-out both; }
+.issue-item:nth-child(1) { animation-delay: 0.00s; }
+.issue-item:nth-child(2) { animation-delay: 0.07s; }
+.issue-item:nth-child(3) { animation-delay: 0.14s; }
+.issue-item:nth-child(4) { animation-delay: 0.21s; }
+.issue-item:nth-child(5) { animation-delay: 0.28s; }
+
+.network-node   { animation: nodePopIn    0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.traffic-packet { animation: packetFloat   1.8s  ease-in-out both; }
+
+.thinking-dot { animation: thinkingDot 1.4s ease-in-out infinite; }
+.thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+
+.progress-bar-fill { background-size: 200% 100%; animation: shimmer 2s linear infinite; }
+
+.bubble-assistant { animation: bubbleInLeft  0.25s ease-out both; }
+.bubble-user      { animation: bubbleInRight 0.25s ease-out both; }
+
+.typing-cursor {
+  animation: typingCursor 1s step-end infinite;
+  display: inline-block;
+  width: 8px;
+  height: 1em;
+  background: var(--text-primary);
+  vertical-align: text-bottom;
+  margin-left: 1px;
+}
+.terminal-output-line { animation: outputReveal 0.15s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+.view-slide-enter { animation: viewSlideIn 0.30s ease-out both; }
 .ai-highlight-ring {
   animation: ai-highlight-pulse 1.6s ease-in-out infinite;
 }
