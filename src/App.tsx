@@ -131,6 +131,7 @@ function App() {
   switch (activeView) {
     case 'dashboard':
       main = <DashboardView />
+      bottom = undefined
       break
     case 'learn':
       main = <LearnView />

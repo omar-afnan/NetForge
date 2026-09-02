@@ -16,6 +16,7 @@ import { ping as runPingTool, runConnectivityMatrix } from '@/assistant/tools'
 import { scanLab } from '@/assistant/diagnose'
 import { executeChange } from '@/assistant/engine.core'
 import { runLabAssist } from '@/assistant/labAssist'
+import { askLLM } from '@/assistant/llm'
 import type { ProposedChange } from '@/assistant/types'
 import type { Device } from '@/network/types'
 import {
@@ -91,6 +92,7 @@ export function IssueTracker() {
   const [hypothesisFeedback, setHypothesisFeedback] = useState<string | null>(null)
   const [hintLevel, setHintLevel] = useState(0)
   const [inlineAi, setInlineAi] = useState<string | null>(null)
+  const [aiBusy, setAiBusy] = useState(false)
   const [verification, setVerification] = useState<{ label: string; ok: boolean; detail: string }[] | null>(null)
   const [attempts, setAttempts] = useState(0)
   const [history, setHistory] = useState<ResolutionRecord[]>([])
@@ -284,18 +286,35 @@ export function IssueTracker() {
     )
   }
 
-  const giveHint = () => {
+  const giveHint = async () => {
+    if (aiBusy) return
     const level = Math.min(hintLevel, 2)
-    const hintText = progressiveHint(evidence, level)
+    const localHint = progressiveHint(evidence, level)
     setHintLevel(level + 1)
-    setInlineAi(`💡 Hint: ${hintText}`)
-    copilot.pushMessage({ id: crypto.randomUUID(), role: 'assistant', kind: 'text', text: `💡 Hint: ${hintText}` })
+
+    // Try the LLM first (the configured AI API key); fall back to the local
+    // rule-based engine so the button never dead-ends when offline.
+    setAiBusy(true)
+    try {
+      const deviceRef = primaryDevice?.hostname ?? failingTest?.source
+      const aiReply = await askLLM(
+        `I am troubleshooting the "${lab.title}" lab in a network simulator. ` +
+          `The suspected failing path is ${failingTest ? `${failingTest.source} cannot reach ${failingTest.destination}. ${failingTest.detail ?? ''}` : 'not yet isolated / all paths currently pass'}. ` +
+          `The affected device appears to be ${deviceRef ?? 'unknown'}. ` +
+          `Give me exactly one focused, beginner-friendly hint about WHERE to look (which device, interface, or command to run). Do not give away the exact answer. One or two short sentences.`,
+      )
+      const hintText = aiReply ?? localHint
+      setInlineAi(`💡 Hint: ${hintText}`)
+      copilot.pushMessage({ id: crypto.randomUUID(), role: 'assistant', kind: 'text', text: `💡 Hint: ${hintText}` })
+    } finally {
+      setAiBusy(false)
+    }
     if (strongestAssist.current === 'None') strongestAssist.current = 'Hint'
   }
 
-  const explainEvidence = () => {
-    if (!evidence) return
-    const explanation = [
+  const explainEvidence = async () => {
+    if (!evidence || aiBusy) return
+    const localExplanation = [
       `🔎 What the evidence shows for ${evidence.hostname}:`,
       ...evidence.rows.map((r) => `• ${r.label}: ${r.value}`),
       '',
@@ -303,8 +322,25 @@ export function IssueTracker() {
       '',
       'Why this matters: a host only uses its default gateway for traffic that leaves its own subnet. Devices on the same subnet never touch it.',
     ].join('\n')
-    setInlineAi(explanation)
-    copilot.pushMessage({ id: crypto.randomUUID(), role: 'assistant', kind: 'text', text: explanation })
+
+    // Ask the LLM to interpret the live evidence; fall back to local reasoning.
+    setAiBusy(true)
+    try {
+      const snapshot = [
+        `Affected device: ${evidence.hostname}`,
+        ...evidence.rows.map((r) => `${r.label}: ${r.value}`),
+        ...evidence.notes.map((n) => `note: ${n.text}`),
+      ].join('\n')
+      const aiReply = await askLLM(
+        `I am investigating a network fault in the "${lab.title}" lab. Here is the live evidence gathered for ${evidence.hostname}:\n\n${snapshot}\n\n` +
+          `Explain what this evidence shows and why it matters for a beginner. Point out the most likely problem and what to check next. 2-4 short sentences.`,
+      )
+      const explanation = aiReply ?? localExplanation
+      setInlineAi(`🔎 ${explanation}`)
+      copilot.pushMessage({ id: crypto.randomUUID(), role: 'assistant', kind: 'text', text: explanation })
+    } finally {
+      setAiBusy(false)
+    }
     if (strongestAssist.current !== 'Full Investigation') strongestAssist.current = 'Explain'
   }
 
@@ -411,7 +447,7 @@ export function IssueTracker() {
       </div>
 
       <div className="flex-1 space-y-3 overflow-auto p-3">
-        {/* 1 · STATUS HEADER — honest three-state ticket, or a sandbox notice */}
+        {/* 1 · STATUS HEADER - honest three-state ticket, or a sandbox notice */}
         {isSandbox ? (
           <div className="panel border p-4">
             <div className="flex items-center gap-2">
@@ -424,8 +460,8 @@ export function IssueTracker() {
             </div>
             <div className="mt-2 text-[12px] leading-relaxed text-[var(--text-secondary)]">
               {devices.length === 0
-                ? 'No topology loaded. Open the Lab Library and load a lab to start troubleshooting — this workspace only tracks a fault once one exists.'
-                : 'This is the baseline competition topology — every device, link and route is healthy by design. There is no fault to investigate here, so it never counts toward lab completion.'}
+                ? 'No topology loaded. Open the Lab Library and load a lab to start troubleshooting - this workspace only tracks a fault once one exists.'
+                : 'This is the baseline competition topology - every device, link and route is healthy by design. There is no fault to investigate here, so it never counts toward lab completion.'}
             </div>
             {devices.length > 0 && (
               <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-data text-[10px] text-[var(--text-dim)]">
@@ -460,17 +496,17 @@ export function IssueTracker() {
             </div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="font-data text-[13px] font-semibold text-[var(--text-primary)]">
-                {primaryDevice?.hostname ?? failingTest?.source ?? '—'}
+                {primaryDevice?.hostname ?? failingTest?.source ?? '-'}
               </span>
               <span className="text-[12px] text-[var(--text-secondary)]">
                 {status === 'resolved'
-                  ? 'Fault repaired — every connectivity test passes.'
+                  ? 'Fault repaired - every connectivity test passes.'
                   : failingTest
                     ? `Cannot reach ${failingTest.destination}`
                     : (issues[0]?.description ?? 'Running audit…')}
               </span>
             </div>
-            {/* honest progress meter — no need to hunt through the re-scan log */}
+            {/* honest progress meter - no need to hunt through the re-scan log */}
             <div className="mt-2 flex items-center gap-2">
               <div className="h-1 flex-1 overflow-hidden bg-[var(--border)]">
                 <div
@@ -492,7 +528,7 @@ export function IssueTracker() {
               <div className="mt-3 flex items-center gap-2 border border-[var(--status-up)] bg-[rgba(22,163,74,0.08)] px-3 py-2">
                 <ShieldCheck className="h-4 w-4 shrink-0 text-[var(--status-up)]" strokeWidth={1.75} />
                 <span className="text-[11px] text-[var(--text-secondary)]">
-                  Connectivity looks restored — verifying to confirm and close the ticket…
+                  Connectivity looks restored - verifying to confirm and close the ticket…
                 </span>
               </div>
             )}
@@ -713,17 +749,19 @@ export function IssueTracker() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="border border-[var(--border-bright)] px-2.5 py-1.5 text-[11px] transition-colors hover:border-[var(--accent-link)]"
-              onClick={giveHint}
+              disabled={aiBusy}
+              className="border border-[var(--border-bright)] px-2.5 py-1.5 text-[11px] transition-colors hover:border-[var(--accent-link)] disabled:cursor-not-allowed disabled:text-[var(--text-dim)]"
+              onClick={() => void giveHint()}
             >
-              💡 Give Me a Hint{hintLevel > 0 ? ` (${Math.min(hintLevel + 1, 3)}/3)` : ''}
+              {aiBusy ? 'Thinking…' : '💡 Give Me a Hint'}{!aiBusy && hintLevel > 0 ? ` (${Math.min(hintLevel + 1, 3)}/3)` : ''}
             </button>
             <button
               type="button"
-              className="border border-[var(--border-bright)] px-2.5 py-1.5 text-[11px] transition-colors hover:border-[var(--accent-link)]"
-              onClick={explainEvidence}
+              disabled={aiBusy}
+              className="border border-[var(--border-bright)] px-2.5 py-1.5 text-[11px] transition-colors hover:border-[var(--accent-link)] disabled:cursor-not-allowed disabled:text-[var(--text-dim)]"
+              onClick={() => void explainEvidence()}
             >
-              🔎 Explain the Evidence
+              {aiBusy ? 'Thinking…' : '🔎 Explain the Evidence'}
             </button>
             <button
               type="button"

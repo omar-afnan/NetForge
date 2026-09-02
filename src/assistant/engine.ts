@@ -87,26 +87,52 @@ export function handleMessage(raw: string): void {
     s.setStatus(s.labAssist.busy ? 'working' : 'idle')
   }
 
-  // Free-form questions that the rule-based engine can't parse are routed to
-  // the LLM (when the /api/assistant key is configured). Everything it returns
-  // is informational only - the LLM can never mutate the simulator. If the
-  // LLM is unavailable (no key, offline, error) we fall back to the local
-  // handler so the copilot always answers.
-  if (parseCommand(trimmed).intent === 'unknown') {
-    window.setTimeout(() => {
+  // QUESTION-shaped messages ("how do I ping?", "what is a VLAN", "explain
+  // routing", anything unparseable) are answered by the LLM when a key is
+  // configured - the rule-based engine only gives canned one-liners for these.
+  // ACTION-shaped messages (configure / add route / find the problem / complete
+  // lab / ping A to B) stay on the deterministic local handlers: the LLM must
+  // never drive simulator mutations. If the LLM is unavailable (no key,
+  // offline, error) we fall back to the local handler so the copilot always
+  // answers.
+  const parsed = parseCommand(trimmed)
+  // Phrased as a "how / what / explain …" question? Then the student wants an
+  // explanation, not an action - even if they named a device ("how do I ping
+  // from PC-01?"). Diagnosis / config / test commands still run locally so the
+  // LLM never drives the simulator.
+  const looksLikeQuestion =
+    /^\s*(how|what|whats|what's|when|where|which|explain|define|teach me|tell me|is|are|do|does|can|could|should)\b/i.test(trimmed)
+  const actionIntents = new Set([
+    'configure', 'gateway', 'route-add', 'route-remove', 'interface-status',
+    'complete-lab', 'diagnose', 'find-problems', 'tests',
+  ])
+  const wantsLLM =
+    parsed.intent === 'unknown' ||
+    parsed.intent === 'concept' ||
+    parsed.intent === 'help' ||
+    parsed.intent === 'greet' ||
+    (looksLikeQuestion && !actionIntents.has(parsed.intent))
+
+  if (wantsLLM) {
+    window.setTimeout(async () => {
       if (isStale()) return
-      window.setTimeout(async () => {
-        if (isStale()) return
-        const reply = await askLLM(trimmed)
-        if (isStale()) return
-        useCopilotStore.getState().pushMessage(
-          reply
-            ? text(reply)
-            : text("I didn't catch that. I'm best at diagnosing, configuring, or fixing labs." +
-                (getSelectedDevice() ? `\nYou have ${getSelectedDevice()!.hostname} selected - "why is this device not working?" will use it.` : '')),
-        )
-        finish()
-      }, 350)
+      const reply = await askLLM(trimmed)
+      if (isStale()) return
+      const store2 = useCopilotStore.getState()
+      if (reply) {
+        store2.pushMessage(text(reply))
+      } else {
+        // No LLM: use whatever the rule-based engine has for this intent.
+        try {
+          for (const m of respond(trimmed)) store2.pushMessage(m)
+        } catch {
+          store2.pushMessage(
+            text("I didn't catch that. Try rephrasing, or ask me to \"find the problem\"." +
+              (getSelectedDevice() ? `\nYou have ${getSelectedDevice()!.hostname} selected.` : '')),
+          )
+        }
+      }
+      finish()
     }, 0)
     return
   }

@@ -1,22 +1,28 @@
 /**
  * Vercel serverless function — AI backend for the NetForge copilot.
  *
- * The Kimi (Moonshot) API key lives ONLY in server-side environment
- * variables (never VITE_*, which would be bundled into client JS and
- * readable by anyone in DevTools).
+ * Works with ANY OpenAI-compatible chat API (Kira AI, Moonshot/Kimi, OpenAI,
+ * OpenRouter, Groq, DeepSeek, …). The API key lives ONLY in server-side env
+ * vars (in local dev the vite.config.ts bridge runs this in Node, so the key
+ * never reaches the browser bundle).
  *
- * Request:  POST { messages: [{ role, content }], system?: string }
+ * Request:  POST { messages: [{ role, content }], system?: string, mode?: 'plan' }
  * Response: 200 { reply: string, fallback: false }
  *      or   200 { fallback: true, reason }  → client uses local engine
  *      or   4xx/5xx { error }
  *
- * Env vars:
- *   KIMI_API_KEY   (or MOONSHOT_API_KEY) — Moonshot API key
- *   KIMI_MODEL     — optional, default "moonshot-v1-8k"
+ * Env vars (first match wins):
+ *   AI_API_KEY  | KIMI_API_KEY | MOONSHOT_API_KEY | VITE_AI_API_KEY | VITE_KIMI_API_KEY
+ *   AI_BASE_URL | KIMI_BASE_URL   — full chat/completions URL
+ *                                   default: https://kiraai.vn/api/v1/chat/completions
+ *   AI_MODEL    | KIMI_MODEL      — default: "kira-3.5-flash"
  */
 
-const MOONSHOT_URL = 'https://api.moonshot.cn/v1/chat/completions'
-const DEFAULT_MODEL = 'moonshot-v1-8k'
+const CHAT_URL =
+  process.env.AI_BASE_URL ||
+  process.env.KIMI_BASE_URL ||
+  'https://kiraai.vn/api/v1/chat/completions'
+const DEFAULT_MODEL = process.env.AI_MODEL || process.env.KIMI_MODEL || 'kira-3.5-flash'
 
 const FALLBACK_SYSTEM = [
   'You are NetForge Copilot, a friendly networking tutor embedded in a network simulator app.',
@@ -63,7 +69,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const apiKey = process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY
+  // VITE_KIMI_API_KEY is accepted as a local-dev convenience (the dev bridge in
+  // vite.config.ts runs this handler in Node, so the key is never shipped to the
+  // browser). For a real deployment use KIMI_API_KEY with no VITE_ prefix.
+  const apiKey =
+    process.env.AI_API_KEY ||
+    process.env.KIMI_API_KEY ||
+    process.env.MOONSHOT_API_KEY ||
+    process.env.VITE_AI_API_KEY ||
+    process.env.VITE_KIMI_API_KEY
   if (!apiKey) {
     // No key configured — tell the client to use its local rule-based engine.
     return res.status(200).json({ fallback: true, reason: 'not_configured' })
@@ -91,24 +105,34 @@ export default async function handler(req, res) {
       .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) })),
   ]
 
-  try {
-    const upstream = await fetch(MOONSHOT_URL, {
+  const callUpstream = () =>
+    fetch(CHAT_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: process.env.KIMI_MODEL || DEFAULT_MODEL,
+        model: DEFAULT_MODEL,
         messages,
         temperature: isPlanMode ? 0 : 0.4,
         max_tokens: isPlanMode ? 1200 : 800,
       }),
     })
 
+  try {
+    // Router models (e.g. kira-auto) intermittently return 5xx / 429 under load.
+    // Retry those up to twice with a short backoff before giving up to the
+    // local engine. 4xx (auth, balance, permission) are never retried.
+    let upstream = await callUpstream()
+    for (let attempt = 1; attempt <= 2 && (upstream.status >= 500 || upstream.status === 429); attempt++) {
+      await new Promise((r) => setTimeout(r, 600 * attempt))
+      upstream = await callUpstream()
+    }
+
     if (!upstream.ok) {
       const detail = await upstream.text().catch(() => '')
-      console.error('Moonshot API error', upstream.status, detail.slice(0, 500))
+      console.error('AI upstream error', upstream.status, detail.slice(0, 500))
       return res.status(200).json({ fallback: true, reason: `upstream_${upstream.status}` })
     }
 

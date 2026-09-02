@@ -19,7 +19,7 @@ import type { ProposedChange } from './types'
  * "Thinking…" forever (input disabled, no escape). Bound every round-trip so a
  * slow/unresponsive backend falls back to the local rule-based engine instead.
  */
-const LLM_TIMEOUT_MS = 10000
+const LLM_TIMEOUT_MS = 20000
 
 function fetchWithTimeout(input: string, init: RequestInit, timeoutMs = LLM_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController()
