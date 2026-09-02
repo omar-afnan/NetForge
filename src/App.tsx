@@ -6,6 +6,7 @@ import { LabCompleteOverlay } from '@/components/labs/LabCompleteOverlay'
 import { IssueTracker } from '@/components/issues/IssueTracker'
 import { TrafficMonitor } from '@/components/traffic/TrafficMonitor'
 const RightSidebar = lazy(() => import('@/components/assistant/RightSidebar').then((m) => ({ default: m.RightSidebar })))
+const DeviceLabRightSidebar = lazy(() => import('@/components/devicelab/DeviceLabRightSidebar').then((m) => ({ default: m.DeviceLabRightSidebar })))
 import { DeviceTable } from '@/components/devices/DeviceTable'
 const TopologyCanvas = lazy(() => import('@/components/topology/TopologyCanvas').then((m) => ({ default: m.TopologyCanvas })))
 import { TopologyToolbar } from '@/components/topology/TopologyToolbar'
@@ -144,8 +145,7 @@ function App() {
       if (deviceLabCopilotRequested) {
         right = (
           <Suspense fallback={null}>
-            <RightSidebar
-              defaultMode="copilot"
+            <DeviceLabRightSidebar
               onClose={() => useUIStore.getState().setDeviceLabCopilotRequested(false)}
             />
           </Suspense>
