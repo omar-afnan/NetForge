@@ -153,7 +153,7 @@ export function applyPlan(changeIds?: string[]): void {
   // If the whole lab now passes, mark it completed in the Lab Library.
   if (passing === matrix.length) {
     const lab = useNetworkStore.getState().lab
-    if (lab.id && lab.id !== 'starter') {
+    if (lab.devices.length > 0) {
       useNetworkStore.getState().completeLab(lab.id, true)
       store.pushMessage(text(`🎉 "${lab.title}" is solved - all ${matrix.length} tests pass. Marked as Completed in your Lab Library.`))
     }

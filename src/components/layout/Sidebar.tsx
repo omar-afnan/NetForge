@@ -11,7 +11,6 @@ import {
   Terminal,
 } from 'lucide-react'
 import { UserButton } from '@clerk/react'
-import { useNetworkStore } from '@/store/networkStore'
 import { useSettingsStore } from '@/store/settingsStore'
 import { useUIStore } from '@/store/uiStore'
 
@@ -30,9 +29,6 @@ const navItems = [
 export function Sidebar() {
   const activeView = useUIStore((s) => s.activeView)
   const setActiveView = useUIStore((s) => s.setActiveView)
-  const lab = useNetworkStore((s) => s.lab)
-  const devices = useNetworkStore((s) => s.devices)
-  const links = useNetworkStore((s) => s.links)
   const glowEffects = useSettingsStore((s) => s.glowEffects)
 
   return (
@@ -73,19 +69,6 @@ export function Sidebar() {
           )
         })}
       </nav>
-
-      <div className="border-t border-[var(--border)] bg-[var(--bg-inset)] p-3 text-[11px]">
-        <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">
-          Environment
-        </div>
-        <div className="font-data text-[12px] text-[var(--text-primary)]">{lab.title}</div>
-        <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-1.5 border-t border-[var(--border)] pt-2 text-[10px]">
-          <span className="text-[var(--text-dim)]">Devices</span>
-          <span className="font-data text-right text-[var(--accent-link)]">{devices.length}</span>
-          <span className="text-[var(--text-dim)]">Links</span>
-          <span className="font-data text-right text-[var(--accent-link)]">{links.length}</span>
-        </div>
-      </div>
 
       <div className="border-t border-[var(--border)] p-3">
         <UserButton />

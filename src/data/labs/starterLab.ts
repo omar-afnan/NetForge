@@ -177,3 +177,14 @@ export const starterLab: LabDefinition = {
   issueCount: 0,
   ...buildStarterTopology(),
 }
+
+/** Empty workspace shown to brand-new users until they build a topology or load a lab. */
+export const blankLab: LabDefinition = {
+  id: 'blank',
+  title: 'Untitled Lab',
+  difficulty: 'beginner',
+  description: 'Empty workspace — add devices or load a lab from the Lab Library.',
+  issueCount: 0,
+  devices: [],
+  links: [],
+}

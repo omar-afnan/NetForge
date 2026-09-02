@@ -15,7 +15,7 @@ import type {
 } from '@/network/types'
 import type { NetworkInterface, StaticRoute } from '@/network/types'
 import { NetworkSimulator } from '@/network/simulator'
-import { starterLab, type LabDefinition } from '@/data/labs/starterLab'
+import { blankLab, starterLab, type LabDefinition } from '@/data/labs/starterLab'
 import { applyFailures, type FailureInjection } from '@/network/failures'
 import { isSameSubnet } from '@/network/ip'
 import { createDevice, nextHostname, planLink } from '@/network/builder'
@@ -293,10 +293,10 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
         ...commit(persisted.devices, persisted.links),
       }
     : {
-        lab: starterLab,
-        baseline: { devices: starterLab.devices, links: starterLab.links },
-        devices: starterLab.devices,
-        links: starterLab.links,
+        lab: blankLab,
+        baseline: { devices: blankLab.devices, links: blankLab.links },
+        devices: blankLab.devices,
+        links: blankLab.links,
         issues: [],
         failures: [],
         proposedFixes: [],
@@ -306,7 +306,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
         packetTrace: null,
         highlightedDeviceId: null,
         completedLabs: labProgress,
-        simulator: createSimulator(starterLab.devices, starterLab.links),
+        simulator: createSimulator(blankLab.devices, blankLab.links),
       }
 
   return {

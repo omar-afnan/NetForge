@@ -57,7 +57,7 @@ export function handleTests(): AssistantMessage[] {
 export function handleCompleteLab(): AssistantMessage[] {
   const netStore = useNetworkStore.getState()
   const labId = netStore.lab.id
-  if (labId && labId !== 'starter') {
+  if (netStore.lab.devices.length > 0) {
     useCopilotStore.getState().setMode('takeover')
     window.setTimeout(() => runLabAssist(labId), 0)
     return [text(`Starting Lab Assist Mode for ${netStore.lab.title}. I'll investigate step by step and explain everything.`)]

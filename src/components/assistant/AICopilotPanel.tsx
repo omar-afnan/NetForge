@@ -159,9 +159,9 @@ export function AICopilotPanel() {
           <button
             type="button"
             className="ai-copilot-takeover-trigger"
-            disabled={busy || lab.id === 'starter'}
+            disabled={busy || lab.devices.length === 0}
             onClick={() => {
-              if (lab.id && lab.id !== 'starter') {
+              if (lab.devices.length > 0) {
                 setMode('takeover')
                 // The driver owns the assist state (steps, busy flag) -
                 // don't pre-start it here or the busy guard blocks the run.
@@ -171,8 +171,8 @@ export function AICopilotPanel() {
           >
             ✨ Take Over This Lab
           </button>
-          {lab.id === 'starter' && (
-            <span className="ai-copilot-takeover-hint">Load a lab to enable takeover</span>
+          {lab.devices.length === 0 && (
+            <span className="ai-copilot-takeover-hint">Add devices or load a lab to enable takeover</span>
           )}
         </div>
       )}
