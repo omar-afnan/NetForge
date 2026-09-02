@@ -25,13 +25,13 @@ import type { AssistantMessage } from '@/assistant/types'
 
 function handleGreet(): AssistantMessage[] {
   const selected = getSelectedDevice()
-  const ctx = selected ? ` I see you have ${selected.hostname} selected — ask me anything about it.` : ''
+  const ctx = selected ? ` I see you have ${selected.hostname} selected - ask me anything about it.` : ''
   return [text(`Hey! 👋 I'm your lab copilot. I can see your topology, run diagnostics, and configure devices when you ask.${ctx}\nTry "why can't PC-01 ping SRV-01?" or "find the problem".`)]
 }
 
 function handleHelp(): AssistantMessage[] {
   return [text([
-    'Here is what I can do — all on your LIVE topology:', '',
+    'Here is what I can do - all on your LIVE topology:', '',
     'Diagnose: "Why can\'t PC-01 ping SRV-01?" / "Find the problem"',
     'Test: "Run connectivity tests"',
     'Configure: "Set PC-01 to 10.1.10.50/24 gateway 10.1.10.1"',
@@ -43,7 +43,7 @@ function handleHelp(): AssistantMessage[] {
 
 function handleUnknown(cmd: ParsedCommand): AssistantMessage[] {
   const selected = getSelectedDevice()
-  const hint = selected ? `\nYou have ${selected.hostname} selected — "why is this device not working?" will use it.` : ''
+  const hint = selected ? `\nYou have ${selected.hostname} selected - "why is this device not working?" will use it.` : ''
   if (cmd.deviceRef) return handleDeviceInfo(cmd)
   return [text("I didn't catch that. I'm best at diagnosing, configuring, or fixing labs." + hint)]
 }
@@ -89,7 +89,7 @@ export function handleMessage(raw: string): void {
 
   // Free-form questions that the rule-based engine can't parse are routed to
   // the LLM (when the /api/assistant key is configured). Everything it returns
-  // is informational only — the LLM can never mutate the simulator. If the
+  // is informational only - the LLM can never mutate the simulator. If the
   // LLM is unavailable (no key, offline, error) we fall back to the local
   // handler so the copilot always answers.
   if (parseCommand(trimmed).intent === 'unknown') {
@@ -103,7 +103,7 @@ export function handleMessage(raw: string): void {
           reply
             ? text(reply)
             : text("I didn't catch that. I'm best at diagnosing, configuring, or fixing labs." +
-                (getSelectedDevice() ? `\nYou have ${getSelectedDevice()!.hostname} selected — "why is this device not working?" will use it.` : '')),
+                (getSelectedDevice() ? `\nYou have ${getSelectedDevice()!.hostname} selected - "why is this device not working?" will use it.` : '')),
         )
         finish()
       }, 350)
@@ -112,7 +112,7 @@ export function handleMessage(raw: string): void {
   }
 
   window.setTimeout(() => {
-    // If the lab changed in the meantime, drop the response — never leak a
+    // If the lab changed in the meantime, drop the response - never leak a
     // reply into another lab's conversation.
     if (isStale()) return
     try {
@@ -136,7 +136,7 @@ export function applyPlan(changeIds?: string[]): void {
   const plan = store.pendingPlan
   if (!plan) { store.pushMessage(text('No plan is currently pending.')); return }
   const changes = changeIds?.length ? plan.changes.filter((c) => changeIds.includes(c.id)) : plan.changes
-  if (changes.length === 0) { store.setPendingPlan(null); store.pushMessage(text('Plan cancelled — no changes were made.')); return }
+  if (changes.length === 0) { store.setPendingPlan(null); store.pushMessage(text('Plan cancelled - no changes were made.')); return }
   store.setStatus('working')
   store.pushMessage(text(`Applying ${changes.length} change${changes.length === 1 ? '' : 's'}…`, { muted: true }))
   const results: string[] = []
@@ -148,14 +148,14 @@ export function applyPlan(changeIds?: string[]): void {
   store.pushMessage(text(results.join('\n')))
   const matrix = runConnectivityMatrix()
   const passing = matrix.filter((t) => t.success).length
-  const summary = passing === matrix.length ? `Verification: all ${matrix.length} tests pass. 🎉` : `Verification: ${passing}/${matrix.length} tests pass — investigating…`
+  const summary = passing === matrix.length ? `Verification: all ${matrix.length} tests pass. 🎉` : `Verification: ${passing}/${matrix.length} tests pass - investigating…`
   store.pushMessage(text(`${summary}\n\n${formatMatrix(matrix)}`))
   // If the whole lab now passes, mark it completed in the Lab Library.
   if (passing === matrix.length) {
     const lab = useNetworkStore.getState().lab
     if (lab.id && lab.id !== 'starter') {
       useNetworkStore.getState().completeLab(lab.id, true)
-      store.pushMessage(text(`🎉 "${lab.title}" is solved — all ${matrix.length} tests pass. Marked as Completed in your Lab Library.`))
+      store.pushMessage(text(`🎉 "${lab.title}" is solved - all ${matrix.length} tests pass. Marked as Completed in your Lab Library.`))
     }
   }
   store.setPendingPlan(null)
@@ -177,5 +177,5 @@ export function applyPlan(changeIds?: string[]): void {
 export function cancelPlan(): void {
   const store = useCopilotStore.getState()
   store.setPendingPlan(null)
-  store.pushMessage(text('Cancelled — no changes were made. The plan is discarded; just ask if you want it again.'))
+  store.pushMessage(text('Cancelled - no changes were made. The plan is discarded; just ask if you want it again.'))
 }

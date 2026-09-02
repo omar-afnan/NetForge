@@ -1,6 +1,6 @@
 /**
  * Device Lab lesson catalogue. Every lesson validates against the REAL
- * simulated device state (CLI device or endpoint form) — a lesson is never
+ * simulated device state (CLI device or endpoint form) - a lesson is never
  * completed by clicking a button alone.
  */
 import type { CliDevice, EndpointDevice } from './cli'
@@ -70,7 +70,7 @@ const routerBeginner: Lesson[] = [
     minutes: 5,
     description: 'Move from user EXEC (>) to privileged EXEC (#) mode.',
     learn: ['User EXEC vs privileged EXEC', 'Why privileged mode is gated', 'The enable command'],
-    objective: 'Enter privileged EXEC mode — the prompt must end with #.',
+    objective: 'Enter privileged EXEC mode - the prompt must end with #.',
     hint: 'From R1> type the command that "enables" privileged access.',
     solution: 'enable',
     check: (d) => {
@@ -100,7 +100,7 @@ const routerBeginner: Lesson[] = [
     title: 'Configure a Password',
     difficulty: 'beginner',
     minutes: 8,
-    description: 'Protect privileged mode — and learn why enable secret beats enable password.',
+    description: 'Protect privileged mode - and learn why enable secret beats enable password.',
     learn: ['enable password stores weakly obfuscated text', 'enable secret stores an MD5 hash', 'Secret wins when both are set'],
     objective: 'Secure privileged mode with an enable secret (use "netforge").',
     hint: 'From global configuration mode: enable secret <password>.',
@@ -109,7 +109,7 @@ const routerBeginner: Lesson[] = [
       const c = d as CliDevice
       if (!c.enableSecret) {
         return c.enablePassword
-          ? 'You set an enable password — but enable secret is the secure, hashed option required here.'
+          ? 'You set an enable password - but enable secret is the secure, hashed option required here.'
           : 'Privileged mode is still unprotected. Set an enable secret from global configuration mode.'
       }
       return null
@@ -128,7 +128,7 @@ const routerBeginner: Lesson[] = [
     check: (d) => {
       const c = d as CliDevice
       if (!c.consolePassword) return 'No console password is configured yet.'
-      if (!c.consoleLogin) return 'A password is set, but "login" was never enabled — the line will not prompt for it.'
+      if (!c.consoleLogin) return 'A password is set, but "login" was never enabled - the line will not prompt for it.'
       return null
     },
   },
@@ -160,12 +160,12 @@ const routerBeginner: Lesson[] = [
     description: 'Router interfaces are administratively down until you enable them.',
     learn: ['shutdown vs no shutdown', 'Administratively down state', 'Link/line protocol messages'],
     objective: 'Bring GigabitEthernet0/0 up with "no shutdown" (keep its IP).',
-    hint: 'The interface must keep 192.168.1.1/24 — and change from administratively down to up.',
+    hint: 'The interface must keep 192.168.1.1/24 - and change from administratively down to up.',
     solution: 'interface gigabitEthernet0/0\nno shutdown',
     check: (d) => {
       const c = d as CliDevice
       const iface = c.interfaces.find((i) => i.name === 'GigabitEthernet0/0')!
-      if (iface.status !== 'up') return 'G0/0 is still administratively down — enable it.'
+      if (iface.status !== 'up') return 'G0/0 is still administratively down - enable it.'
       if (iface.ip !== '192.168.1.1') return 'The interface is up but lost its IP address. Re-apply 192.168.1.1 255.255.255.0.'
       return null
     },
@@ -224,7 +224,7 @@ const routerIntermediate: Lesson[] = [
       const route = c.routes.find((r) => r.destination === '192.168.2.0' && r.mask === '255.255.255.0')
       if (!route) return 'The 192.168.2.0/24 static route is missing.'
       if (route.nextHop !== '192.168.1.2') return `The route uses next-hop ${route.nextHop}. It must be 192.168.1.2.`
-      if (!ran(c, 'show ip route')) return 'Route added — now verify it appears with show ip route.'
+      if (!ran(c, 'show ip route')) return 'Route added - now verify it appears with show ip route.'
       return null
     },
   },
@@ -233,10 +233,10 @@ const routerIntermediate: Lesson[] = [
     title: 'Configure Remote Access (VTY)',
     difficulty: 'intermediate',
     minutes: 8,
-    description: 'Protect Telnet/SSH lines — the gateway to configuring SSH later.',
+    description: 'Protect Telnet/SSH lines - the gateway to configuring SSH later.',
     learn: ['line vty 0 4', 'Why VTY lines need their own password', 'Path to SSH: domain name + crypto keys'],
     objective: 'Password-protect the VTY lines ("netforge") and enable login.',
-    hint: 'Enter line configuration for vty 0 4 — same pattern as the console.',
+    hint: 'Enter line configuration for vty 0 4 - same pattern as the console.',
     solution: 'line vty 0 4\npassword netforge\nlogin',
     check: (d) => {
       const c = d as CliDevice
@@ -282,7 +282,7 @@ const routerIntermediate: Lesson[] = [
     title: 'Troubleshoot an Interface',
     difficulty: 'intermediate',
     minutes: 10,
-    description: 'This router was pre-configured — incorrectly. Find and fix it.',
+    description: 'This router was pre-configured - incorrectly. Find and fix it.',
     learn: ['Reading show ip interface brief', 'Spotting a wrong IP', 'Fixing without losing the rest'],
     objective: 'G0/0 has a WRONG address and is disabled. Correct it to 192.168.1.1/24 and bring it up.',
     hint: 'Re-enter interface configuration: set the correct IP, then no shutdown.',
@@ -298,7 +298,7 @@ const routerIntermediate: Lesson[] = [
       const c = d as CliDevice
       const iface = c.interfaces.find((i) => i.name === 'GigabitEthernet0/0')!
       if (iface.ip !== '192.168.1.1') return `G0/0 currently has ${iface.ip ?? 'no IP'}. It must be 192.168.1.1/24.`
-      if (iface.status !== 'up') return 'The IP is correct now — but the interface is still administratively down.'
+      if (iface.status !== 'up') return 'The IP is correct now - but the interface is still administratively down.'
       return null
     },
   },
@@ -333,7 +333,7 @@ const switchBeginner: Lesson[] = [
     solution: 'enable',
     check: (d) => {
       const c = d as CliDevice
-      if (!reachedPrivileged(c)) return 'Still in user EXEC mode — the prompt must end with #.'
+      if (!reachedPrivileged(c)) return 'Still in user EXEC mode - the prompt must end with #.'
       return null
     },
   },
@@ -361,7 +361,7 @@ const switchBeginner: Lesson[] = [
     description: 'Protect privileged mode on the switch.',
     learn: ['enable secret vs enable password', 'Consistent passwords across devices'],
     objective: 'Set an enable secret ("netforge").',
-    hint: 'enable secret netforge — from global configuration mode.',
+    hint: 'enable secret netforge - from global configuration mode.',
     solution: 'enable secret netforge',
     check: (d) => {
       const c = d as CliDevice
@@ -384,7 +384,7 @@ const switchBeginner: Lesson[] = [
       const svi = c.interfaces.find((i) => i.name === 'Vlan1')
       if (!svi?.ip) return 'The management SVI (Vlan1) has no IP address.'
       if (svi.ip !== '192.168.1.2' || svi.mask !== '255.255.255.0') return `Vlan1 has ${svi.ip}/${svi.mask ?? '?'}. It must be 192.168.1.2/24.`
-      if (svi.status !== 'up') return 'Correct IP — now enable the SVI with no shutdown.'
+      if (svi.status !== 'up') return 'Correct IP - now enable the SVI with no shutdown.'
       return null
     },
   },
@@ -412,7 +412,7 @@ const switchBeginner: Lesson[] = [
     description: 'Confirm the management SVI is live.',
     learn: ['Reading show ip interface brief on a switch', 'Vlan1 as an interface'],
     objective: 'Run the interface overview and confirm Vlan1 is up with its IP.',
-    hint: 'show ip interface brief — Vlan1 should be up/up with 192.168.1.2.',
+    hint: 'show ip interface brief - Vlan1 should be up/up with 192.168.1.2.',
     solution: 'show ip interface brief',
     check: (d) => {
       const c = d as CliDevice
@@ -433,7 +433,7 @@ const switchIntermediate: Lesson[] = [
     description: 'Segment the switch at Layer 2.',
     learn: ['VLANs as broadcast domains', 'vlan <id> + name', 'show vlan brief'],
     objective: 'Create VLAN 10 named STUDENTS.',
-    hint: 'vlan 10, then name STUDENTS — from global configuration mode.',
+    hint: 'vlan 10, then name STUDENTS - from global configuration mode.',
     solution: 'vlan 10\nname STUDENTS',
     check: (d) => {
       const c = d as CliDevice
@@ -475,7 +475,7 @@ const switchIntermediate: Lesson[] = [
       const c = d as CliDevice
       const port = c.interfaces.find((i) => i.name === 'GigabitEthernet0/1')!
       if (port.switchportMode !== 'trunk') return 'Gi0/1 is not a trunk port.'
-      if (!ran(c, 'show interfaces trunk')) return 'Trunk configured — now verify with show interfaces trunk.'
+      if (!ran(c, 'show interfaces trunk')) return 'Trunk configured - now verify with show interfaces trunk.'
       return null
     },
   },
@@ -503,7 +503,7 @@ const switchIntermediate: Lesson[] = [
     title: 'Troubleshoot a Port',
     difficulty: 'intermediate',
     minutes: 8,
-    description: 'A disabled port looks like a dead device — bring Fa0/2 back.',
+    description: 'A disabled port looks like a dead device - bring Fa0/2 back.',
     learn: ['administratively down in show output', 'no shutdown on a switch port', 'Confirming link state'],
     objective: 'Fa0/2 is administratively down. Enable it.',
     hint: 'interface fastEthernet0/2 → no shutdown.',
@@ -528,7 +528,7 @@ const serverLessons: Lesson[] = [
     title: 'Meet the Server',
     difficulty: 'beginner',
     minutes: 4,
-    description: 'A server is an endpoint with services — inspect its network identity first.',
+    description: 'A server is an endpoint with services - inspect its network identity first.',
     learn: ['Servers as specialized hosts', 'Network identity: IP, mask, gateway, DNS', 'Reading the network panel'],
     objective: 'Open the Network panel and inspect the interface details.',
     hint: 'Expand the "Interface Details" section on the right-hand device panel.',
@@ -608,7 +608,7 @@ const serverLessons: Lesson[] = [
     title: 'Web Server (Simulated Service)',
     difficulty: 'intermediate',
     minutes: 4,
-    description: 'Enable the simulated HTTP service. This is a visual simulation — no real sockets are opened.',
+    description: 'Enable the simulated HTTP service. This is a visual simulation - no real sockets are opened.',
     learn: ['What a web server does', 'Port 80/443 conceptually', 'Simulated vs real services in NetForge'],
     objective: 'Enable the Web (HTTP) service on the server.',
     hint: 'Toggle the Web service in the Services panel.',
@@ -677,9 +677,9 @@ const pcLessons: Lesson[] = [
     title: 'Fix the Subnet Mask',
     difficulty: 'beginner',
     minutes: 6,
-    description: 'PC-01 was pre-configured with a mismatched mask — correct it.',
+    description: 'PC-01 was pre-configured with a mismatched mask - correct it.',
     learn: ['Masks must match the network design', 'A wrong mask silently breaks half the network'],
-    objective: 'The mask is 255.255.0.0 — it should be 255.255.255.0. Fix it and Apply.',
+    objective: 'The mask is 255.255.0.0 - it should be 255.255.255.0. Fix it and Apply.',
     hint: 'Only the Subnet Mask field needs changing.',
     solution: 'Subnet Mask: 255.255.255.0 · Apply',
     setup: (device) => {

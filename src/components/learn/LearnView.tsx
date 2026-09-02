@@ -1,10 +1,69 @@
 import { useMemo, useState } from 'react'
-import { BookOpen, CheckCircle2, Circle, FlaskConical, Lock } from 'lucide-react'
+import { BookOpen, CheckCircle2, Circle, FlaskConical, Lock, Monitor } from 'lucide-react'
+import { EXPLAINERS } from '@/components/learn/Explainers'
 import { CURRICULUM, type CurriculumModule, type Lesson } from '@/data/curriculum'
 import { useLearnProgress } from '@/store/progressStore'
 import { useNetworkStore } from '@/store/networkStore'
 import { useUIStore } from '@/store/uiStore'
 import { ALL_LABS } from '@/data/labs'
+
+/** Maps each Learn module to the Device Lab lesson that lets the student practice the concept hands-on. */
+const MODULE_DEVICE_LAB: Record<string, { kind: 'router' | 'switch' | 'server' | 'pc'; lessonId: string; label: string }> = {
+  fundamentals: { kind: 'router', lessonId: 'r-meet', label: 'Meet the Router' },
+  ethernet: { kind: 'switch', lessonId: 's-meet', label: 'Meet the Switch' },
+  ipv4: { kind: 'pc', lessonId: 'p-ip', label: 'Configure IPv4' },
+  subnetting: { kind: 'pc', lessonId: 'p-mask', label: 'Configure a Subnet Mask' },
+  arp: { kind: 'router', lessonId: 'r-verify', label: 'Verify an Interface' },
+  switching: { kind: 'switch', lessonId: 's-vlan', label: 'Create a VLAN' },
+  routing: { kind: 'router', lessonId: 'r-static-route', label: 'Add a Static Route' },
+  'tcp-udp': { kind: 'server', lessonId: 'v-web', label: 'Explore the Web Service' },
+  'dhcp-dns': { kind: 'server', lessonId: 'v-dhcp', label: 'Explore DHCP' },
+  nat: { kind: 'router', lessonId: 'r-default-route', label: 'Configure a Default Route' },
+  services: { kind: 'server', lessonId: 'v-meet', label: 'Meet the Server' },
+  security: { kind: 'router', lessonId: 'r-secret', label: 'Configure an Enable Secret' },
+  troubleshooting: { kind: 'pc', lessonId: 'p-diagnose', label: 'Diagnose Connectivity' },
+}
+
+function QuizBlock({ section }: { section: Lesson['content'][number] }) {
+  const [picked, setPicked] = useState<number | null>(null)
+  const correct = picked === section.answerIndex
+  return (
+    <div className="my-3 border border-[var(--border-bright)] bg-[var(--bg-elevated)] p-3">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Quick check</div>
+      <p className="mt-1 text-[12px] font-semibold text-[var(--text-primary)]">{section.question}</p>
+      <div className="mt-2 space-y-1.5">
+        {section.options?.map((opt, i) => {
+          const chosen = picked === i
+          const isAnswer = i === section.answerIndex
+          const revealed = picked !== null
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setPicked(i)}
+              className={`flex w-full items-center gap-2 border px-2.5 py-1.5 text-left text-[12px] transition-colors ${
+                revealed && isAnswer
+                  ? 'border-[var(--status-up)] text-[var(--status-up)]'
+                  : chosen
+                    ? 'border-red-500/60 text-red-300'
+                    : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--border-bright)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <span className="font-data text-[10px] text-[var(--text-dim)]">{String.fromCharCode(65 + i)}</span>
+              {opt}
+            </button>
+          )
+        })}
+      </div>
+      {picked !== null && (
+        <p className={`mt-2 text-[11px] ${correct ? 'text-[var(--status-up)]' : 'text-[var(--accent-amber)]'}`}>
+          {correct ? '✓ Correct. ' : 'Not quite. '}
+          {section.explanation}
+        </p>
+      )}
+    </div>
+  )
+}
 
 function SectionBlock({ type, text }: { type: Lesson['content'][number]['type']; text: string }) {
   if (type === 'code' || type === 'diagram') {
@@ -40,12 +99,14 @@ function LessonReader({
   const toggleLesson = useLearnProgress((s) => s.toggleLesson)
   const done = useLearnProgress((s) => Boolean(s.lessons[`${module.id}/${lesson.id}`]))
   const loadLab = useNetworkStore((s) => s.loadLab)
+  const openDeviceLabLesson = useUIStore((s) => s.openDeviceLabLesson)
   const setActiveView = useUIStore((s) => s.setActiveView)
 
   const relatedLabs = useMemo(
     () => ALL_LABS.filter((lab) => module.relatedLabIds?.includes(lab.id)),
     [module.relatedLabIds],
   )
+  const deviceLab = MODULE_DEVICE_LAB[module.id]
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -67,9 +128,14 @@ function LessonReader({
             {lesson.minutes} min lesson
           </div>
           <h2 className="mt-1 text-lg font-bold text-[var(--text-primary)]">{lesson.title}</h2>
-          {lesson.content.map((section, index) => (
-            <SectionBlock key={index} type={section.type} text={section.text} />
-          ))}
+          {lesson.content.map((section, index) => {
+            if (section.type === 'quiz') return <QuizBlock key={index} section={section} />
+            if (section.type === 'explainer') {
+              const Explainer = EXPLAINERS[section.text]
+              return Explainer ? <Explainer key={index} /> : null
+            }
+            return <SectionBlock key={index} type={section.type} text={section.text} />
+          })}
 
           <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-4">
             <button
@@ -84,6 +150,16 @@ function LessonReader({
               <CheckCircle2 className="h-4 w-4" strokeWidth={1.75} />
               {done ? 'Completed ✓' : 'Mark as complete'}
             </button>
+            {deviceLab && (
+              <button
+                type="button"
+                className="flex items-center gap-1.5 border border-[var(--border)] px-3 py-1.5 text-[12px] text-[var(--accent-link)] transition-colors hover:border-[var(--accent-link)]"
+                onClick={() => openDeviceLabLesson(deviceLab.kind, deviceLab.lessonId)}
+              >
+                <Monitor className="h-3.5 w-3.5" strokeWidth={1.75} />
+                Try in Device Lab: {deviceLab.label}
+              </button>
+            )}
             {relatedLabs.map((lab) => (
               <button
                 key={lab.id}
@@ -135,7 +211,7 @@ export function LearnView() {
       <div className="panel-header flex items-center justify-between">
         <span className="flex items-center gap-2">
           <BookOpen className="h-3.5 w-3.5" strokeWidth={1.75} />
-          Learning — CCNA-level curriculum
+          Learning - CCNA-level curriculum
         </span>
         <span className="font-data text-[10px] font-normal normal-case tracking-normal text-[var(--text-secondary)]">
           {totalDone}/{totalAvailable} lessons · {overallPct}%

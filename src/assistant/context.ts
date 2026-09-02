@@ -44,7 +44,7 @@ export function formatDeviceList(): string {
   return getDevices()
     .map((device) => {
       const ip = primaryIp(device)
-      return `• ${device.hostname} — ${device.type}${ip ? ` (${ip})` : ' (no IP)'}`
+      return `• ${device.hostname} - ${device.type}${ip ? ` (${ip})` : ' (no IP)'}`
     })
     .join('\n')
 }
@@ -69,7 +69,7 @@ export function formatTopologyOverview(): string {
   const { lab, links, issues } = useNetworkStore.getState()
   const devices = getDevices()
   const lines: string[] = [
-    `Lab: ${lab.title} (${lab.difficulty}) — ${devices.length} devices, ${links.length} links.`,
+    `Lab: ${lab.title} (${lab.difficulty}) - ${devices.length} devices, ${links.length} links.`,
     '',
     'Devices:',
     formatDeviceList(),

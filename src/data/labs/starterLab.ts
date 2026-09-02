@@ -105,7 +105,7 @@ function link(
   }
 }
 
-/** Fresh, unmutated baseline topology — callers clone from this. */
+/** Fresh, unmutated baseline topology - callers clone from this. */
 export function buildStarterTopology(): { devices: Device[]; links: NetworkLink[] } {
   return {
     devices: [

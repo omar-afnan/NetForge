@@ -8,7 +8,7 @@ import type { PingTest } from './types'
 import { getDevices } from './context'
 
 /**
- * Root-cause analysis. Reads ONLY live simulator state — no answer keys —
+ * Root-cause analysis. Reads ONLY live simulator state - no answer keys -
  * and turns failure reasons into concrete, reviewable ProposedChange objects.
  */
 
@@ -125,7 +125,7 @@ export function diagnosePing(sourceRef: string, destinationIp: string): Diagnosi
       if (host) {
         const gw = findGatewayIpFor(host)
         explanation = `${host.hostname} has a default gateway that is not in its own subnet, so it can never reach it.`
-        teachingPoint = 'The gateway must be an IP on the SAME subnet as the host — usually the router interface on that LAN.'
+        teachingPoint = 'The gateway must be an IP on the SAME subnet as the host - usually the router interface on that LAN.'
         if (gw) fixes.push({ id: crypto.randomUUID(), summary: `Fix ${host.hostname} default gateway → ${gw}`, deviceRef: host.hostname, kind: 'gateway', payload: { gateway: gw } })
       }
       break
@@ -140,7 +140,7 @@ export function diagnosePing(sourceRef: string, destinationIp: string): Diagnosi
         if (nextHop) {
           fixes.push({ id: crypto.randomUUID(), summary: `Add static route on ${host.hostname}: ${network} via ${nextHop}`, deviceRef: host.hostname, kind: 'route-add', payload: { destination: getNetworkAddress(destinationIp, destMask), mask: destMask, nextHop } })
         } else {
-          explanation += ' I could not find a neighbour router that already reaches this network — the gap may be further along the path.'
+          explanation += ' I could not find a neighbour router that already reaches this network - the gap may be further along the path.'
         }
       }
       break
@@ -159,8 +159,8 @@ export function diagnosePing(sourceRef: string, destinationIp: string): Diagnosi
     case 'ARP resolution failed':
     case 'ARP resolution failed for gateway': {
       explanation = reason === 'ARP resolution failed for gateway'
-        ? `${failedAt} could not ARP for its gateway — the gateway device is down, unconfigured, or the link between them is down.`
-        : `${failedAt} could not ARP for ${destinationIp} — nothing on that segment answers to that IP.`
+        ? `${failedAt} could not ARP for its gateway - the gateway device is down, unconfigured, or the link between them is down.`
+        : `${failedAt} could not ARP for ${destinationIp} - nothing on that segment answers to that IP.`
       teachingPoint = 'ARP failing means Layer 2 cannot resolve the next MAC: wrong IP, down interface, or a dead link.'
       if (destDevice) {
         const destDown = destDevice.interfaces.find((i) => i.status === 'down')
@@ -314,7 +314,7 @@ function resolveDestination(destination: string): string | undefined {
 /** Format the connectivity matrix as a compact check/cross report. */
 export function formatMatrix(matrix: PingTest[]): string {
   return matrix
-    .map((test) => `${test.success ? '✓' : '✗'} ${test.source} → ${test.destination}${test.success ? '' : ` — ${test.detail}`}`)
+    .map((test) => `${test.success ? '✓' : '✗'} ${test.source} → ${test.destination}${test.success ? '' : ` - ${test.detail}`}`)
     .join('\n')
 }
 

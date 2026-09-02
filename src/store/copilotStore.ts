@@ -54,7 +54,7 @@ const GREETING: AssistantMessage = {
   text: [
     'Hi! I am NetOps Copilot, your networking lab assistant. ',
     '',
-    'I can see your live topology, run real diagnostics, explain networking concepts, and — in Takeover mode apply configurations for you.',
+    'I can see your live topology, run real diagnostics, explain networking concepts, and - in Takeover mode apply configurations for you.',
     '',
     'Try: "Why can\'t PC-01 ping SRV-01?", "Find the problem", or "Complete this lab for me".',
   ].join('\n'),
@@ -120,7 +120,7 @@ export const useCopilotStore = create<CopilotState>((set, get) => ({
   switchLab: (labId, options) => {
     const state = get()
     const conversations = { ...state.labConversations }
-    // A lab load always starts a fresh conversation for that lab — never
+    // A lab load always starts a fresh conversation for that lab - never
     // restore messages from a previous run or from another lab.
     if (options?.fresh || !conversations[labId]) {
       conversations[labId] = [GREETING]

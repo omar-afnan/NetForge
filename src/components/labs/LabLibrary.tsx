@@ -23,7 +23,7 @@ export function LabLibrary() {
           map and device panels, then reset the baseline to keep building.
         </p>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {labs.map((lab) => {
             const active = lab.id === activeLabId
             const progress = completedLabs[lab.id]

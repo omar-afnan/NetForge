@@ -55,7 +55,7 @@ function persistLabProgress(progress: Record<string, { completed: boolean; compl
 
 function persistState(state: NetworkState) {
   try {
-    // packets is a live, in-memory session log — never persisted.
+    // packets is a live, in-memory session log - never persisted.
     const { simulator, packets, ...rest } = state as any
     localStorage.setItem(STORAGE_KEY, JSON.stringify(rest))
   } catch {
@@ -323,7 +323,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
         selectedDeviceId: null,
         selectedLinkId: null,
         packetTrace: null,
-        packets: [], // live session log — never carry packets between labs
+        packets: [], // live session log - never carry packets between labs
         ...commit(broken.devices, broken.links),
       })
       useNetworkStore.setState({ highlightedDeviceId: null })

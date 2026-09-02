@@ -2,10 +2,10 @@
  * Bridge from the copilot chat to the Kimi (Moonshot) LLM via the
  * `/api/assistant` serverless function.
  *
- * The API key never reaches the browser — the function holds it in a
+ * The API key never reaches the browser - the function holds it in a
  * server-side env var. If the function is unavailable, unconfigured, or
  * errors, askLLM() resolves to `null` and the caller falls back to the
- * local rule-based engine, so the copilot NEVER breaks — online or not.
+ * local rule-based engine, so the copilot NEVER breaks - online or not.
  */
 import { formatTopologyOverview, summarizeDevice, getSelectedDevice, formatLabInfo } from './context'
 import { useCopilotStore } from '@/store/copilotStore'
@@ -18,7 +18,7 @@ export function buildSystemPrompt(): string {
     'You are NetForge Copilot, a friendly networking tutor embedded in a network simulator app used by students.',
     'The student is currently inside a hands-on lab. LIVE snapshot of their simulated network follows.',
     'Ground your answers in this state when relevant. Be concise, encouraging, and practical.',
-    'You cannot change the network yourself — if a configuration change is needed, tell the student exactly what to change (device, setting, value).',
+    'You cannot change the network yourself - if a configuration change is needed, tell the student exactly what to change (device, setting, value).',
     'Prefer short paragraphs and bullet lists. Use Cisco terminology where it aids learning.',
     '',
     '--- LIVE NETWORK SNAPSHOT ---',
@@ -41,7 +41,7 @@ function toChatHistory(messages: AssistantMessage[]): { role: 'user' | 'assistan
 
 /**
  * Ask the LLM. Resolves to a reply string, or `null` when the backend is
- * unavailable (no key configured / error) — callers must have a local
+ * unavailable (no key configured / error) - callers must have a local
  * fallback ready.
  */
 export async function askLLM(userText: string): Promise<string | null> {
@@ -84,7 +84,7 @@ export async function llmConfigured(): Promise<boolean> {
 }
 
 /* ────────────────────────────────────────────────────────────────────────
- * AI TAKEOVER — LLM-driven lab planning
+ * AI TAKEOVER - LLM-driven lab planning
  * ────────────────────────────────────────────────────────────────────── */
 
 export interface LLMPlan {
@@ -94,11 +94,11 @@ export interface LLMPlan {
 
 const PLAN_KINDS = new Set(['gateway', 'interface', 'interface-status', 'route-add', 'route-remove', 'link-status'])
 
-/** Full network snapshot for the planning prompt — includes link ids so the LLM can restore downed links. */
+/** Full network snapshot for the planning prompt - includes link ids so the LLM can restore downed links. */
 export function buildNetworkSnapshot(): string {
   const { devices, links, lab, issues } = useNetworkStore.getState()
   const lines: string[] = [
-    `Lab objective: "${lab.title}" (${lab.difficulty}) — ${lab.description}`,
+    `Lab objective: "${lab.title}" (${lab.difficulty}) - ${lab.description}`,
     '',
     'Devices and their configuration:',
   ]
@@ -110,7 +110,7 @@ export function buildNetworkSnapshot(): string {
   for (const link of links) {
     const source = devices.find((d) => d.id === link.sourceDeviceId)
     const target = devices.find((d) => d.id === link.targetDeviceId)
-    lines.push(`- id:${link.id} — ${source?.hostname ?? '?'} ↔ ${target?.hostname ?? '?'} [${link.status}]`)
+    lines.push(`- id:${link.id} - ${source?.hostname ?? '?'} ↔ ${target?.hostname ?? '?'} [${link.status}]`)
   }
   if (issues.length > 0) {
     lines.push('', `Open issues detected: ${issues.length}.`)
@@ -137,7 +137,7 @@ const isIp = (v: unknown): v is string => isStr(v) && /^\d{1,3}(\.\d{1,3}){3}$/.
 
 /**
  * Validate LLM-proposed changes against the simulator's supported change
- * schema. Anything malformed, hallucinated, or unsupported is dropped —
+ * schema. Anything malformed, hallucinated, or unsupported is dropped -
  * only changes that `executeChange` can safely run survive.
  */
 function sanitizeChanges(raw: unknown): ProposedChange[] {
@@ -212,7 +212,7 @@ function sanitizeChanges(raw: unknown): ProposedChange[] {
 /**
  * Ask the LLM to diagnose the live network and propose a fix plan.
  * Resolves `null` whenever the LLM is unavailable or returns nothing
- * usable — callers must fall back to the local `scanLab()` planner.
+ * usable - callers must fall back to the local `scanLab()` planner.
  */
 export async function requestLLMPlan(): Promise<LLMPlan | null> {
   try {

@@ -1,5 +1,4 @@
 import { Sidebar } from './Sidebar'
-import { StatusBar } from './StatusBar'
 
 interface AppShellProps {
   children: React.ReactNode
@@ -26,7 +25,6 @@ export function AppShell({ children, rightPanel, bottomPanel }: AppShellProps) {
           </div>
         </div>
       </div>
-      <StatusBar />
     </div>
   )
 }

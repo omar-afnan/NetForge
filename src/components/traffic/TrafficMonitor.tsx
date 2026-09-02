@@ -20,9 +20,9 @@ function matchesDevice(packet: Packet, device: Device): boolean {
 }
 
 function formatTime(timestamp: string | undefined): string {
-  if (!timestamp) return '—'
+  if (!timestamp) return '-'
   const date = new Date(timestamp)
-  if (Number.isNaN(date.getTime())) return '—'
+  if (Number.isNaN(date.getTime())) return '-'
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
@@ -98,7 +98,7 @@ export function TrafficMonitor() {
         <div>
           <div className="text-[9px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Success rate</div>
           <div className={`mt-0.5 font-data text-lg leading-none ${total ? (successRate === 100 ? 'status-up' : 'status-warn') : 'text-[var(--text-dim)]'}`}>
-            {total ? `${successRate}%` : '—'}
+            {total ? `${successRate}%` : '-'}
           </div>
         </div>
         <div>

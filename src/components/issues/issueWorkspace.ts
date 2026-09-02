@@ -1,5 +1,5 @@
 /**
- * Issue workspace logic — turns LIVE network state into the troubleshooting
+ * Issue workspace logic - turns LIVE network state into the troubleshooting
  * flow: failure point, evidence, hypothesis feedback, hints, verification.
  *
  * Everything reads the existing simulator/stores. No answer keys, no
@@ -94,7 +94,7 @@ export interface EvidenceRow {
 }
 
 export interface EvidenceNote {
-  /** Soft observation — points at what to check, never the fix. */
+  /** Soft observation - points at what to check, never the fix. */
   tone: 'note' | 'warn'
   text: string
   /** Hypothesis categories this observation supports. */
@@ -112,7 +112,7 @@ export interface Evidence {
 
 /**
  * Build evidence for one device purely from live state. Interpretations are
- * educational nudges — they highlight mismatches without prescribing the fix.
+ * educational nudges - they highlight mismatches without prescribing the fix.
  */
 export function gatherEvidence(
   device: Device,
@@ -143,7 +143,7 @@ export function gatherEvidence(
     if (!device.defaultGateway && primary?.ipAddress) {
       notes.push({
         tone: 'note',
-        text: `${device.hostname} has no default gateway configured. Traffic to its own subnet still works — traffic anywhere else has no exit.`,
+        text: `${device.hostname} has no default gateway configured. Traffic to its own subnet still works - traffic anywhere else has no exit.`,
         categories: ['gateway'],
       })
     } else if (onLinkRouterIp && device.defaultGateway && device.defaultGateway !== onLinkRouterIp) {
@@ -161,7 +161,7 @@ export function gatherEvidence(
     }
   }
 
-  // Interpretation 2: neighbours on the same switch — do they share the network?
+  // Interpretation 2: neighbours on the same switch - do they share the network?
   if (primary?.ipAddress && primary.subnetMask) {
     const switchIds = new Set(
       links
@@ -209,7 +209,7 @@ export function gatherEvidence(
 }
 
 /* ──────────────────────────────────────────────
- * Failure point — where does the failing path break?
+ * Failure point - where does the failing path break?
  * ────────────────────────────────────────────── */
 
 export interface FailurePoint {
@@ -238,7 +238,7 @@ export function buildFailurePoint(
 
   const hops = traceRoute(sourceHost, destination)
   // The traceroute appends a separate "failed" hop that often repeats the last
-  // forwarded device — collapse it so the ❌ lands on the actual hop.
+  // forwarded device - collapse it so the ❌ lands on the actual hop.
   const failedIdx = hops.findIndex((hop) => hop.status === 'failed')
   if (failedIdx > 0 && hops[failedIdx].device === hops[failedIdx - 1].device) {
     hops.splice(failedIdx - 1, 1)
@@ -254,7 +254,7 @@ export function buildFailurePoint(
 }
 
 /* ──────────────────────────────────────────────
- * Hypothesis feedback — educational, evidence-driven
+ * Hypothesis feedback - educational, evidence-driven
  * ────────────────────────────────────────────── */
 
 export interface HypothesisFeedback {
@@ -276,9 +276,9 @@ export function evaluateHypothesis(
         ? `ping ${evidence.rows.find((r) => r.label === 'Default Gateway')?.value ?? 'the gateway'}`
         : 'ping the default gateway',
       subnet: 'ping a neighbour on the same switch and compare both network addresses',
-      ip: 'ping a neighbour on the same switch — if that works, the local IP is fine',
+      ip: 'ping a neighbour on the same switch - if that works, the local IP is fine',
       routing: 'show ip route on the last working hop',
-      physical: 'show interfaces — look for status down',
+      physical: 'show interfaces - look for status down',
       vlan: 'compare which ports the two hosts use on the switch',
       dhcp: 'check the address the device actually received against the expected scope',
       dns: "compare the name's resolved address with the address the server actually owns",
@@ -291,15 +291,15 @@ export function evaluateHypothesis(
   }
 
   const nudges: Record<IssueCategory, string> = {
-    ip: 'That is possible, but the current evidence does not strongly support it. Try pinging a device on the same subnet first — if that succeeds, the local address is probably fine.',
+    ip: 'That is possible, but the current evidence does not strongly support it. Try pinging a device on the same subnet first - if that succeeds, the local address is probably fine.',
     subnet:
       'A wrong mask can make local traffic look remote, but check the basics first: can this device reach anything at all?',
     gateway:
-      'The gateway only matters for traffic leaving the subnet. First prove where the path actually breaks — try a ping to a device on the same subnet.',
+      'The gateway only matters for traffic leaving the subnet. First prove where the path actually breaks - try a ping to a device on the same subnet.',
     routing:
       'Routing could be involved, but confirm the host side first. Check whether the device can reach its own gateway before looking at router tables.',
     vlan: 'VLAN issues usually cut off entire groups of ports. Is more than one device affected, or just this one?',
-    dhcp: 'DHCP problems usually show up as a missing or clearly wrong address. The device does have an address configured — verify whether it belongs to the right network.',
+    dhcp: 'DHCP problems usually show up as a missing or clearly wrong address. The device does have an address configured - verify whether it belongs to the right network.',
     dns: 'DNS translates names to addresses. If pings by IP address fail too, DNS is not the culprit.',
     physical:
       'A physical fault usually takes out the whole device. Check its interfaces and whether neighbours on the same switch still work.',
@@ -315,7 +315,7 @@ export function evaluateHypothesis(
 }
 
 /* ──────────────────────────────────────────────
- * Progressive hints — 3 strength levels
+ * Progressive hints - 3 strength levels
  * ────────────────────────────────────────────── */
 
 export function progressiveHint(evidence: Evidence | null, level: number): string {
@@ -327,8 +327,8 @@ export function progressiveHint(evidence: Evidence | null, level: number): strin
   }
   if (level === 1) {
     return warn
-      ? 'Look at the warning in your evidence — it compares what the device HAS with what it SHOULD have. Think about which device handles traffic that leaves the local network.'
-      : 'Think about what device a host uses to reach destinations outside its own subnet — and check that configuration carefully.'
+      ? 'Look at the warning in your evidence - it compares what the device HAS with what it SHOULD have. Think about which device handles traffic that leaves the local network.'
+      : 'Think about what device a host uses to reach destinations outside its own subnet - and check that configuration carefully.'
   }
   const configured = evidence?.rows.find((r) => r.label === 'Default Gateway')?.value
   const actual = evidence?.rows.find((r) => r.label === 'Connected Router Interface')?.value
@@ -336,12 +336,12 @@ export function progressiveHint(evidence: Evidence | null, level: number): strin
     return `The evidence shows the mismatch: ${evidence?.hostname} is configured to use ${configured}, but the router interface actually living on its subnet is ${actual}. For traffic to leave the local network, the gateway must point at a live interface on the same subnet. Fix whichever value is wrong, then re-test.`
   }
   return warn
-    ? 'The evidence contains a warning that compares what the device HAS with what it SHOULD have — resolve that mismatch and re-test.'
-    : 'Compare every configured value in the evidence against the live network state — the mismatch is the fault.'
+    ? 'The evidence contains a warning that compares what the device HAS with what it SHOULD have - resolve that mismatch and re-test.'
+    : 'Compare every configured value in the evidence against the live network state - the mismatch is the fault.'
 }
 
 /* ──────────────────────────────────────────────
- * Verification — real tests only
+ * Verification - real tests only
  * ────────────────────────────────────────────── */
 
 export interface VerificationTest {
@@ -388,7 +388,7 @@ export function buildVerificationTests(
 }
 
 /* ──────────────────────────────────────────────
- * Resolution history — per-lab, localStorage-backed
+ * Resolution history - per-lab, localStorage-backed
  * ────────────────────────────────────────────── */
 
 export interface ResolutionRecord {

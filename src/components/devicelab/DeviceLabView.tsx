@@ -4,6 +4,8 @@ import { useDeviceLabStore } from '@/store/deviceLabStore'
 import { useUIStore } from '@/store/uiStore'
 import type { DeviceKind } from '@/store/deviceLabStore'
 import { COURSES, allLessons, findLesson } from '@/devicelab/lessons'
+import { explorerHotspots, explorerFirstLesson } from '@/devicelab/explorerData'
+import { DeviceExplorer } from '@/components/devicelab/DeviceExplorer'
 import type { LessonCheckCtx } from '@/devicelab/lessons'
 import type { CliDevice, EndpointDevice } from '@/devicelab/cli'
 import { celebrateLab } from '@/lib/celebrate'
@@ -31,7 +33,7 @@ function HomePage({ onOpen }: { onOpen: (kind: DeviceKind) => void }) {
       <div className="mx-auto w-full max-w-4xl p-6">
         <h1 className="text-lg font-bold text-[var(--text-primary)]">Learn how real network devices are configured.</h1>
         <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-          Guided, hands-on configuration lessons on simulated devices. Choose a device to begin — your progress is saved locally.
+          Guided, hands-on configuration lessons on simulated devices. Choose a device to begin - your progress is saved locally.
         </p>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {COURSES.map((course) => {
@@ -67,7 +69,7 @@ function HomePage({ onOpen }: { onOpen: (kind: DeviceKind) => void }) {
   )
 }
 
-function LessonListPage({ kind, onBack, onOpen }: { kind: DeviceKind; onBack: () => void; onOpen: (lessonId: string) => void }) {
+function LessonListPage({ kind, onBack, onOpen, onExplore }: { kind: DeviceKind; onBack: () => void; onOpen: (lessonId: string) => void; onExplore: () => void }) {
   const progress = useDeviceLabStore((s) => s.progress)
   const course = COURSES.find((c) => c.kind === kind)!
   const lessons = allLessons(course)
@@ -90,6 +92,22 @@ function LessonListPage({ kind, onBack, onOpen }: { kind: DeviceKind; onBack: ()
         <p className="mt-1 text-[12px] text-[var(--text-secondary)]">{course.blurb}</p>
         <div className="mt-4">
           <ProgressBar done={done} total={lessons.length} />
+        </div>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={onExplore}
+            className="border border-[var(--accent-link)] bg-[var(--accent-link)]/10 px-4 py-2 text-[12px] font-semibold text-[var(--accent-link)] transition-colors hover:bg-[var(--accent-link)]/20"
+          >
+            Explore the {course.title.replace('Course', '').trim()} first
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpen(lessons[0]?.id ?? '')}
+            className="border border-[var(--border)] px-4 py-2 text-[12px] text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+          >
+            Skip Introduction
+          </button>
         </div>
         {course.sections.map((section) => (
           <div key={section.label} className="mt-6">
@@ -343,7 +361,7 @@ function ConnectivityPanel({ kind, pingDest, setPingDest, lastPing, setLastPing,
       </div>
       {lastPing && (
         <div className={`mt-2 border p-2 font-mono text-[11px] ${lastPing.ok ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : 'border-red-500/40 bg-red-500/10 text-red-300'}`}>
-          {lastPing.ok ? `✓ Reply from ${lastPing.destination} — ${lastPing.detail}` : `✗ Ping to ${lastPing.destination} failed — ${lastPing.detail}`}
+          {lastPing.ok ? `✓ Reply from ${lastPing.destination} - ${lastPing.detail}` : `✗ Ping to ${lastPing.destination} failed - ${lastPing.detail}`}
         </div>
       )}
     </div>
@@ -359,7 +377,7 @@ function ServicesPanel({ isServer, device, toggleService }: {
   return (
     <div className="border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
       <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Services</div>
-      <div className="mb-3 text-[10px] text-[var(--text-dim)]">These services are visual simulations — no real sockets are opened.</div>
+      <div className="mb-3 text-[10px] text-[var(--text-dim)]">These services are visual simulations - no real sockets are opened.</div>
       {([
         ['web', 'Web Server (HTTP)'],
         ['dns', 'DNS Server'],
@@ -473,7 +491,7 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
-        {/* LEFT — instructions */}
+        {/* LEFT - instructions */}
         <div className="min-h-0 overflow-auto border-r border-[var(--border)] p-5">
           <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Lesson</div>
           <h2 className="mt-1 text-base font-bold text-[var(--text-primary)]">{lesson.title}</h2>
@@ -560,7 +578,7 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
           )}
         </div>
 
-        {/* RIGHT — the interactive device */}
+        {/* RIGHT - the interactive device */}
         <div className="flex min-h-0 flex-col gap-3 p-5">
           {kind === 'router' && <CliDevicePanel kind="router" device={device as CliDevice} />}
           {kind === 'switch' && <CliDevicePanel kind="switch" device={device as CliDevice} />}
@@ -586,20 +604,48 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
 export function DeviceLabView() {
   const [openKind, setOpenKind] = useState<DeviceKind | null>(null)
   const [openLessonId, setOpenLessonId] = useState<string | null>(null)
+  const [exploreKind, setExploreKind] = useState<DeviceKind | null>(null)
+  const pending = useUIStore((s) => s.pendingDeviceLabLesson)
+  const clearPending = useUIStore((s) => s.clearPendingDeviceLabLesson)
+
+  // Deep-link support: Learn's "Try in Device Lab" opens the lab directly at the
+  // matching lesson instead of the course home page.
+  useEffect(() => {
+    if (pending) {
+      setOpenKind(pending.kind)
+      setOpenLessonId(pending.lessonId)
+      clearPending()
+    }
+  }, [pending, clearPending])
 
   // The right sidebar (Inspector / AI Copilot) is only useful while a lesson
-  // with the interactive device is open — "Ask Copilot" answers render there.
+  // with the interactive device is open - "Ask Copilot" answers render there.
   const setDeviceLabLessonOpen = useUIStore((s) => s.setDeviceLabLessonOpen)
   useEffect(() => {
     setDeviceLabLessonOpen(Boolean(openKind && openLessonId))
     return () => setDeviceLabLessonOpen(false)
   }, [openKind, openLessonId, setDeviceLabLessonOpen])
 
+  if (exploreKind) {
+    return (
+      <DeviceExplorer
+        kind={exploreKind}
+        hotspots={explorerHotspots[exploreKind]}
+        firstLessonId={explorerFirstLesson[exploreKind]}
+        onBack={() => setExploreKind(null)}
+        onStart={(lessonId) => {
+          setExploreKind(null)
+          setOpenKind(exploreKind)
+          setOpenLessonId(lessonId)
+        }}
+      />
+    )
+  }
   if (openKind && openLessonId) {
     return <LessonRunner kind={openKind} lessonId={openLessonId} onBack={() => setOpenLessonId(null)} onOpenLesson={(id) => setOpenLessonId(id)} />
   }
   if (openKind) {
-    return <LessonListPage kind={openKind} onBack={() => setOpenKind(null)} onOpen={(id) => setOpenLessonId(id)} />
+    return <LessonListPage kind={openKind} onBack={() => setOpenKind(null)} onOpen={(id) => setOpenLessonId(id)} onExplore={() => setExploreKind(openKind)} />
   }
   return <HomePage onOpen={(kind) => { setOpenKind(kind); setOpenLessonId(null) }} />
 }

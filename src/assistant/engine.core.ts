@@ -71,8 +71,8 @@ export function wrap(result: { ok: boolean; error?: string; data?: string }): { 
 }
 
 export const MODE_HINT: Record<string, string> = {
-  learning: '🧠 Learning mode — I explain, you configure. Switch to Takeover to let me apply changes.',
-  takeover: '⚡ Takeover mode — I can apply configurations directly; big changes still need approval.',
+  learning: '🧠 Learning mode - I explain, you configure. Switch to Takeover to let me apply changes.',
+  takeover: '⚡ Takeover mode - I can apply configurations directly; big changes still need approval.',
 }
 
 export function learningSteps(target: Device, changes: ProposedChange[]): AssistantMessage {

@@ -29,7 +29,7 @@ function findTargetInterface(device: Device, interfaceRef: string | undefined): 
 }
 
 /* ============================================================
- * Read-only tools — the assistant's "eyes" on the live lab.
+ * Read-only tools - the assistant's "eyes" on the live lab.
  * ============================================================ */
 
 export function listDevices(): Device[] {
@@ -88,7 +88,7 @@ export function routingTableReport(ref: string): ToolResult<string> {
   if (routes.length === 0) return { ok: true, data: `${device.hostname} has no routes yet.` }
   const lines = routes.map((route) => {
     const via = route.nextHop ? `via ${route.nextHop}` : 'directly connected'
-    return `  ${route.destination}/${maskToPrefix(route.mask)} — ${via} (${route.interfaceName}) [${route.status}]`
+    return `  ${route.destination}/${maskToPrefix(route.mask)} - ${via} (${route.interfaceName}) [${route.status}]`
   })
   return { ok: true, data: `Routing table for ${device.hostname}:\n${lines.join('\n')}` }
 }
@@ -103,7 +103,7 @@ export function arpTableReport(ref: string): ToolResult<string> {
   return { ok: true, data: `ARP table for ${device.hostname}:\n${lines.join('\n')}` }
 }
 
-/** Ping every PC/server against every other — the lab's connectivity report card. */
+/** Ping every PC/server against every other - the lab's connectivity report card. */
 export function runConnectivityMatrix(): PingTest[] {
   const { simulator } = useNetworkStore.getState()
   const endpoints = getDevices().filter(
@@ -128,7 +128,7 @@ export function runConnectivityMatrix(): PingTest[] {
 }
 
 /* ============================================================
- * Mutation tools — every write goes through the real network
+ * Mutation tools - every write goes through the real network
  * store actions (deviceId-based) so there is one source of truth.
  * ============================================================ */
 
@@ -148,14 +148,14 @@ export function configureInterface(args: {
 
   if (!args.ip) return { ok: false, error: 'Which IP address should I configure?' }
   if (!isValidIpv4(args.ip) || args.ip.split('.').some((octet) => Number(octet) > 255)) {
-    return { ok: false, error: `"${args.ip}" is not a valid IPv4 address (octets must be 0–255). No changes were made.` }
+    return { ok: false, error: `"${args.ip}" is not a valid IPv4 address (octets must be 0-255). No changes were made.` }
   }
 
   let mask: string
   try {
     mask = typeof args.prefix === 'number' ? prefixToMask(args.prefix) : (args.mask ?? '255.255.255.0')
   } catch {
-    return { ok: false, error: `/${args.prefix} is not a valid prefix length (0–32). No changes were made.` }
+    return { ok: false, error: `/${args.prefix} is not a valid prefix length (0-32). No changes were made.` }
   }
   if (!isValidIpv4(mask) || mask.split('.').some((octet) => Number(octet) > 255)) {
     return { ok: false, error: `"${mask}" is not a valid subnet mask. No changes were made.` }
@@ -201,7 +201,7 @@ export function configureGateway(args: { deviceRef?: string; gateway?: string })
     (iface) => iface.ipAddress && iface.subnetMask && iface.status === 'up',
   )
   if (!hasUsableInterface && (device.type === 'pc' || device.type === 'server')) {
-    return { ok: false, error: `${device.hostname} has no configured interface yet — set its IP first, then the gateway. No changes were made.` }
+    return { ok: false, error: `${device.hostname} has no configured interface yet - set its IP first, then the gateway. No changes were made.` }
   }
 
   try {
@@ -256,7 +256,7 @@ export function addStaticRoute(args: {
   try {
     mask = typeof args.prefix === 'number' ? prefixToMask(args.prefix) : (args.mask ?? '255.255.255.0')
   } catch {
-    return { ok: false, error: `/${args.prefix} is not a valid prefix length (0–32). No changes were made.` }
+    return { ok: false, error: `/${args.prefix} is not a valid prefix length (0-32). No changes were made.` }
   }
 
   try {

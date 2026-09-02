@@ -43,7 +43,7 @@ export function AICopilotPanel() {
 
   const send = (raw: string) => {
     const value = raw.trim()
-    // Only block while a chat answer is being composed — the AI takeover must
+    // Only block while a chat answer is being composed - the AI takeover must
     // NOT lock the chat: the user can ask questions while it works.
     if (!value || status === 'thinking') return
     handleMessage(value)
@@ -163,7 +163,7 @@ export function AICopilotPanel() {
             onClick={() => {
               if (lab.id && lab.id !== 'starter') {
                 setMode('takeover')
-                // The driver owns the assist state (steps, busy flag) —
+                // The driver owns the assist state (steps, busy flag) -
                 // don't pre-start it here or the busy guard blocks the run.
                 window.setTimeout(() => runLabAssist(lab.id), 0)
               }

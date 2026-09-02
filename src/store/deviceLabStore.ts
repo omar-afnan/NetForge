@@ -27,6 +27,7 @@ const STORAGE_KEY = 'netforge-device-lab'
 
 interface Persisted {
   progress: Record<DeviceKind, string[]>
+  explored: Record<DeviceKind, boolean>
   router: CliDevice
   switch: CliDevice
   server: EndpointDevice
@@ -37,6 +38,7 @@ interface Persisted {
 
 function freshState(): Omit<Persisted, 'progress'> {
   return {
+    explored: { router: false, switch: false, server: false, pc: false },
     router: createRouterDevice(),
     switch: createSwitchDevice(),
     server: createEndpoint('server', 'SERVER-01'),
@@ -68,6 +70,7 @@ function clone<T>(value: T): T {
 
 interface DeviceLabState {
   progress: Record<DeviceKind, string[]>
+  explored: Record<DeviceKind, boolean>
   router: CliDevice
   switch: CliDevice
   server: EndpointDevice
@@ -80,6 +83,7 @@ interface DeviceLabState {
   toggleService: (kind: 'server', service: 'web' | 'dns' | 'dhcp') => void
   completeLesson: (kind: DeviceKind, lessonId: string) => void
   isDone: (kind: DeviceKind, lessonId: string) => boolean
+  markExplored: (kind: DeviceKind) => void
   resetDevice: (kind: DeviceKind) => void
   resetAll: () => void
 }
@@ -87,6 +91,7 @@ interface DeviceLabState {
 function persist(state: DeviceLabState): void {
   const data: Persisted = {
     progress: state.progress,
+    explored: state.explored,
     router: state.router,
     switch: state.switch,
     server: state.server,
@@ -106,6 +111,7 @@ const fresh = freshState()
 
 export const useDeviceLabStore = create<DeviceLabState>((set, get) => ({
   progress: saved?.progress ?? { router: [], switch: [], server: [], pc: [] },
+  explored: saved?.explored ?? { router: false, switch: false, server: false, pc: false },
   router: saved?.router ?? fresh.router,
   switch: saved?.switch ?? fresh.switch,
   server: saved?.server ?? fresh.server,
@@ -133,16 +139,36 @@ export const useDeviceLabStore = create<DeviceLabState>((set, get) => ({
   },
 
   setEndpoint: (kind, patch) => {
+    // Form fields are always strings. Normalize them:
+    //   - trim whitespace
+    //   - treat '' OR '0.0.0.0' as "unassigned" for the optional fields
+    //     (gateway / DNS). '0.0.0.0' is the placeholder shown in the UI and
+    //     is the standard "no address" sentinel in IP networking, so the
+    //     user can leave it untouched and Apply still works.
+    //   - IP and mask stay strict - a typed '0.0.0.0' there is genuinely
+    //     invalid and should still be reported as an error.
+    const norm = (v: string | null | undefined) => {
+      const trimmed = (v ?? '').trim()
+      if (trimmed === '') return null
+      if (trimmed === '0.0.0.0') return null
+      return trimmed
+    }
+    const clean: Partial<EndpointDevice> = {
+      ip: patch.ip?.trim() === '' ? null : (patch.ip ?? null),
+      mask: patch.mask?.trim() === '' ? null : (patch.mask ?? null),
+      gateway: norm(patch.gateway),
+      dns: norm(patch.dns),
+    }
     const errors: string[] = []
-    if (patch.ip && !isValidIpv4(patch.ip)) errors.push(`Invalid IPv4 address: ${patch.ip}`)
-    if (patch.mask && !isValidIpv4(patch.mask)) errors.push(`Invalid subnet mask: ${patch.mask}`)
-    if (patch.gateway && !isValidIpv4(patch.gateway)) errors.push(`Invalid gateway address: ${patch.gateway}`)
-    if (patch.dns && !isValidIpv4(patch.dns)) errors.push(`Invalid DNS address: ${patch.dns}`)
-    if (patch.gateway && patch.ip && patch.mask && !isSameSubnet(patch.ip, patch.gateway, patch.mask)) {
-      errors.push(`Gateway ${patch.gateway} is not on the same subnet as ${patch.ip}/${patch.mask}`)
+    if (clean.ip && !isValidIpv4(clean.ip)) errors.push(`Invalid IPv4 address: ${clean.ip}`)
+    if (clean.mask && !isValidIpv4(clean.mask)) errors.push(`Invalid subnet mask: ${clean.mask}`)
+    if (clean.gateway && !isValidIpv4(clean.gateway)) errors.push(`Invalid gateway address: ${clean.gateway}`)
+    if (clean.dns && !isValidIpv4(clean.dns)) errors.push(`Invalid DNS address: ${clean.dns}`)
+    if (clean.gateway && clean.ip && clean.mask && !isSameSubnet(clean.ip, clean.gateway, clean.mask)) {
+      errors.push(`Gateway ${clean.gateway} is not on the same subnet as ${clean.ip}/${clean.mask}`)
     }
     if (errors.length > 0) return errors
-    set((state) => ({ [kind]: { ...state[kind], ...patch } }) as unknown as Partial<DeviceLabState>)
+    set((state) => ({ [kind]: { ...state[kind], ...clean } }) as unknown as Partial<DeviceLabState>)
     persist(get())
     return []
   },
@@ -180,6 +206,12 @@ export const useDeviceLabStore = create<DeviceLabState>((set, get) => ({
   },
 
   isDone: (kind, lessonId) => get().progress[kind].includes(lessonId),
+
+  markExplored: (kind) => {
+    if (get().explored[kind]) return
+    set((state) => ({ explored: { ...state.explored, [kind]: true } }))
+    persist(get())
+  },
 
   resetDevice: (kind) => {
     if (kind === 'router') set({ router: createRouterDevice(), routerConsole: freshState().routerConsole })

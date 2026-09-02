@@ -10,8 +10,10 @@ let noticeTimer: ReturnType<typeof setTimeout> | undefined
 interface UIState {
   activeView: View
   sidebarCollapsed: boolean
-  /** Device Lab: true while a lesson (with the interactive device) is open — the right sidebar is only useful then. */
+  /** Device Lab: true while a lesson (with the interactive device) is open - the right sidebar is only useful then. */
   deviceLabLessonOpen: boolean
+  /** Deep-link request to open Device Lab directly at a lesson (e.g. "Try in Device Lab" from Learn). */
+  pendingDeviceLabLesson: { kind: 'router' | 'switch' | 'server' | 'pc'; lessonId: string } | null
   topologyTool: TopologyTool
   pendingDeviceType: DeviceType
   wireKind: CableKind
@@ -19,6 +21,8 @@ interface UIState {
   setActiveView: (view: View) => void
   toggleSidebar: () => void
   setDeviceLabLessonOpen: (open: boolean) => void
+  openDeviceLabLesson: (kind: 'router' | 'switch' | 'server' | 'pc', lessonId: string) => void
+  clearPendingDeviceLabLesson: () => void
   setTopologyTool: (tool: TopologyTool) => void
   setPendingDeviceType: (type: DeviceType) => void
   setWireKind: (kind: CableKind) => void
@@ -29,6 +33,7 @@ export const useUIStore = create<UIState>((set) => ({
   activeView: 'topology',
   sidebarCollapsed: false,
   deviceLabLessonOpen: false,
+  pendingDeviceLabLesson: null,
   topologyTool: 'select',
   pendingDeviceType: 'pc',
   wireKind: 'copper',
@@ -36,6 +41,9 @@ export const useUIStore = create<UIState>((set) => ({
   setActiveView: (activeView) => set({ activeView }),
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
   setDeviceLabLessonOpen: (deviceLabLessonOpen) => set({ deviceLabLessonOpen }),
+  openDeviceLabLesson: (kind, lessonId) =>
+    set({ activeView: 'devicelab', pendingDeviceLabLesson: { kind, lessonId } }),
+  clearPendingDeviceLabLesson: () => set({ pendingDeviceLabLesson: null }),
   setTopologyTool: (topologyTool) => set({ topologyTool }),
   setPendingDeviceType: (pendingDeviceType) => set({ pendingDeviceType }),
   setWireKind: (wireKind) => set({ wireKind }),

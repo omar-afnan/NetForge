@@ -19,7 +19,7 @@ export const KNOWLEDGE: KnowledgeEntry[] = [
       '• Same subnet → the device talks directly (ARP + Ethernet).',
       '• Different subnet → the device hands the packet to its gateway.',
       '',
-      'If the gateway is missing or wrong, a device can chat with its neighbours but never leave its own subnet — the classic "can ping locally, nothing else works" symptom.',
+      'If the gateway is missing or wrong, a device can chat with its neighbours but never leave its own subnet - the classic "can ping locally, nothing else works" symptom.',
     ].join('\n'),
   },
   {
@@ -28,7 +28,7 @@ export const KNOWLEDGE: KnowledgeEntry[] = [
     body: [
       'A subnet mask splits an IP address into a network part and a host part.',
       '',
-      'Example: 192.168.1.10 with mask 255.255.255.0 → network 192.168.1.0, hosts .1–.254.',
+      'Example: 192.168.1.10 with mask 255.255.255.0 → network 192.168.1.0, hosts .1-.254.',
       '',
       'Two devices can only talk directly if they are in the SAME subnet. Otherwise traffic must go through a router (the gateway). Most "why can\'t these two ping each other" problems are a mask or gateway mistake.',
     ].join('\n'),
@@ -51,7 +51,7 @@ export const KNOWLEDGE: KnowledgeEntry[] = [
     body: [
       'ARP answers the question: "who has IP x.x.x.x? Tell me your MAC address."',
       '',
-      'Before any IP packet leaves on Ethernet, the device needs the destination (or gateway) MAC. If ARP fails, the ping dies immediately — usually meaning the target IP does not exist on that segment, or the link/interface is down.',
+      'Before any IP packet leaves on Ethernet, the device needs the destination (or gateway) MAC. If ARP fails, the ping dies immediately - usually meaning the target IP does not exist on that segment, or the link/interface is down.',
       '',
       'Inspect it with `show arp` in the terminal or the ARP section in the device panel.',
     ].join('\n'),
@@ -69,7 +69,7 @@ export const KNOWLEDGE: KnowledgeEntry[] = [
     keywords: /\bvlan\b/,
     title: 'VLANs',
     body: [
-      'A VLAN is a logical grouping of ports into its own broadcast domain. Devices in different VLANs cannot talk directly even on the same switch — they need a router (or Layer-3 switch).',
+      'A VLAN is a logical grouping of ports into its own broadcast domain. Devices in different VLANs cannot talk directly even on the same switch - they need a router (or Layer-3 switch).',
       '',
       'This simulator models one flat broadcast domain per shared segment, so VLAN tagging is not required in the current labs.',
     ].join('\n'),
@@ -90,7 +90,7 @@ export const KNOWLEDGE: KnowledgeEntry[] = [
     keywords: /\bdefault route\b/,
     title: 'Default Route',
     body: [
-      'A default route (0.0.0.0/0) is the route used when nothing more specific matches — the router\'s version of a default gateway.',
+      'A default route (0.0.0.0/0) is the route used when nothing more specific matches - the router\'s version of a default gateway.',
       '',
       'Add one when a stub router only has one exit: destination 0.0.0.0, mask 0.0.0.0, next hop = neighbour router.',
     ].join('\n'),
@@ -101,7 +101,7 @@ export const KNOWLEDGE: KnowledgeEntry[] = [
     body: [
       'Switches work at Layer 2: they forward frames using MAC addresses and never touch IP routing.',
       '',
-      'All ports on a switch share one broadcast domain. A switch passing traffic between a PC and a router does not need an IP itself — management IPs are optional.',
+      'All ports on a switch share one broadcast domain. A switch passing traffic between a PC and a router does not need an IP itself - management IPs are optional.',
     ].join('\n'),
   },
   {
@@ -147,7 +147,7 @@ export const KNOWLEDGE: KnowledgeEntry[] = [
       'A broadcast domain is the set of devices that receive each other\'s broadcast frames.',
       '',
       '• A switch extends one broadcast domain across all its ports.',
-      '• A router ENDS a broadcast domain — broadcasts never cross it.',
+      '• A router ENDS a broadcast domain - broadcasts never cross it.',
       '',
       'That\'s one reason routers (or VLANs) are used to segment large networks.',
     ].join('\n'),
@@ -158,14 +158,14 @@ export const KNOWLEDGE: KnowledgeEntry[] = [
     body: [
       'NAT (Network Address Translation) rewrites source/destination IP addresses, usually so many private addresses can share one public IP.',
       '',
-      'Not simulated in the current labs — everything here uses routable private addressing directly.',
+      'Not simulated in the current labs - everything here uses routable private addressing directly.',
     ].join('\n'),
   },
   {
     keywords: /\bping\b|\bicmp\b/,
     title: 'Ping & ICMP',
     body: [
-      'Ping sends ICMP Echo Request packets and waits for Echo Replies — the standard "is this reachable?" test.',
+      'Ping sends ICMP Echo Request packets and waits for Echo Replies - the standard "is this reachable?" test.',
       '',
       'A failing ping is a clue, not an answer. Ask me "why can\'t X ping Y" and I\'ll walk the path hop by hop to find where packets die.',
     ].join('\n'),
@@ -174,7 +174,7 @@ export const KNOWLEDGE: KnowledgeEntry[] = [
     keywords: /\btraceroute\b/,
     title: 'Traceroute',
     body: [
-      'Traceroute lists every router a packet crosses on the way to a destination — and where the journey stops.',
+      'Traceroute lists every router a packet crosses on the way to a destination - and where the journey stops.',
       '',
       'The last hop shown before failure is usually where the problem lives. You can also read the path via the Traffic view after a ping.',
     ].join('\n'),

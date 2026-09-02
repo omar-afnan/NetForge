@@ -5,10 +5,10 @@ import { useUIStore } from '@/store/uiStore'
 const CHAR_MS = 18
 
 /**
- * Live "AI is solving the lab" overlay, docked over the real topology canvas —
+ * Live "AI is solving the lab" overlay, docked over the real topology canvas -
  * not a fake screen. Shows the takeover feed while the AI works, typewrites a
  * summary when solved, plays the completion moment, then returns to the lab
- * library (only after validation passed — the driver only reaches these
+ * library (only after validation passed - the driver only reaches these
  * phases on success).
  */
 function TypedLine({ text }: { text: string }) {

@@ -2,6 +2,7 @@ import { AlertTriangle, HardDrive, Link2, Network } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { lazy, Suspense, useEffect, useRef } from 'react'
 import { LabLibrary } from '@/components/labs/LabLibrary'
+import { LabCompleteOverlay } from '@/components/labs/LabCompleteOverlay'
 import { IssueTracker } from '@/components/issues/IssueTracker'
 import { TrafficMonitor } from '@/components/traffic/TrafficMonitor'
 const RightSidebar = lazy(() => import('@/components/assistant/RightSidebar').then((m) => ({ default: m.RightSidebar })))
@@ -84,7 +85,7 @@ function TopologyView() {
           <TopologyCanvas />
         </Suspense>
       </div>
-      {/* Live AI takeover overlay — docked over the real topology canvas. */}
+      {/* Live AI takeover overlay - docked over the real topology canvas. */}
       <TakeoverOverlay />
     </div>
   )
@@ -92,7 +93,6 @@ function TopologyView() {
 
 function App() {
   const activeView = useUIStore((s) => s.activeView)
-  const deviceLabLessonOpen = useUIStore((s) => s.deviceLabLessonOpen)
   const glowEffects = useSettingsStore((s) => s.glowEffects)
   const { isSignedIn } = useAuth()
 
@@ -100,7 +100,7 @@ function App() {
     document.body.classList.toggle('glow-off', !glowEffects)
   }, [glowEffects])
 
-  // After signing in from the landing page, land on the dashboard — but only on the
+  // After signing in from the landing page, land on the dashboard - but only on the
   // false→true transition, not on every activeView change (which would re-trigger on
   // every sidebar click and trap the user on the dashboard).
   const wasSignedIn = useRef(false)
@@ -124,11 +124,7 @@ function App() {
       <NetworkTerminal />
     </Suspense>
   )
-  let right: React.ReactNode | undefined = (
-    <Suspense fallback={null}>
-      <RightSidebar />
-    </Suspense>
-  )
+  let right: React.ReactNode | undefined = undefined
 
   switch (activeView) {
     case 'dashboard':
@@ -142,12 +138,17 @@ function App() {
     case 'devicelab':
       main = <DeviceLabView />
       bottom = undefined
-      // Inspector/Copilot only make sense inside an open lesson (Ask Copilot
-      // answers render in the right sidebar) — hide it on the home/list pages.
-      right = deviceLabLessonOpen ? right : undefined
+      right = undefined
       break
     case 'topology':
       main = <TopologyView />
+      // The right sidebar (Inspector / AI Copilot) is only relevant on the
+      // topology page where users select devices/links on the canvas.
+      right = (
+        <Suspense fallback={null}>
+          <RightSidebar />
+        </Suspense>
+      )
       break
     case 'terminal':
       main = <NetworkTerminal />
@@ -175,6 +176,7 @@ function App() {
   return (
     <AppShell rightPanel={right} bottomPanel={bottom}>
       {main}
+      <LabCompleteOverlay />
     </AppShell>
   )
 }

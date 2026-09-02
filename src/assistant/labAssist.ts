@@ -40,7 +40,7 @@ async function pause(ms: number, isStale: () => boolean) {
 /**
  * Run a REAL ping and animate the packet along the simulator's actual path on
  * the topology canvas (via the existing packetTrace system). Everything shown
- * is driven by live network state — nothing is prerecorded.
+ * is driven by live network state - nothing is prerecorded.
  */
 async function animateTest(
   sourceRef: string,
@@ -127,7 +127,7 @@ export async function runLabAssist(labId: string) {
   let plan = initialScan.plan
 
   // Consult the LLM first (when KIMI_API_KEY is configured on the server):
-  // it sees the same live state and proposes changes in the same schema —
+  // it sees the same live state and proposes changes in the same schema -
   // invalid items are dropped client-side, so nothing unsafe can execute.
   // If the LLM is unavailable, unconfigured, or returns nothing usable, the
   // local rule-based planner above is used unchanged.
@@ -138,7 +138,7 @@ export async function runLabAssist(labId: string) {
     if (aiPlan.reasoning) push(`🤖 AI diagnosis: ${aiPlan.reasoning}`)
   }
 
-  // Nothing to automate — still give a visible takeover moment.
+  // Nothing to automate - still give a visible takeover moment.
   if (plan.length === 0) {
     store.startLabAssist(labId, [])
     store.setTakeoverPhase('working')
@@ -152,9 +152,9 @@ export async function runLabAssist(labId: string) {
       await delay(400)
       line('Running connectivity tests...')
       await delay(800)
-      line('✓ All tests passing — nothing to fix', 'ok')
+      line('✓ All tests passing - nothing to fix', 'ok')
       store.setTakeoverSummary(
-        `I analyzed "${lab.title}" and everything is already healthy —\nall connectivity tests pass. Nothing needed fixing.\n\n✓ Lab objective completed`,
+        `I analyzed "${lab.title}" and everything is already healthy -\nall connectivity tests pass. Nothing needed fixing.\n\n✓ Lab objective completed`,
       )
       store.setTakeoverPhase('summary')
       net.completeLab(labId, true)
@@ -167,11 +167,11 @@ export async function runLabAssist(labId: string) {
     store.stopLabAssist()
     push(
       [
-        `I checked \"${lab.title}\" — here's what I found:`,
+        `I checked \"${lab.title}\" - here's what I found:`,
         '',
         ...problems.map((p) => `${p.severity === 'critical' ? '🔴' : p.severity === 'warning' ? '🟠' : '🔵'} ${p.summary}`),
         '',
-        'I couldn\'t find safe automatic fixes for these — they likely need manual topology changes (cabling, new devices, etc.).',
+        'I couldn\'t find safe automatic fixes for these - they likely need manual topology changes (cabling, new devices, etc.).',
         'Try asking me "why can\'t PC-01 ping SRV-01?" and I\'ll walk you through the fix step by step.',
       ].join('\n'),
     )
@@ -268,7 +268,7 @@ export async function runLabAssist(labId: string) {
         break
       }
       if (round > 1) {
-        line(`Round ${round} — re-diagnosing...`, 'info')
+        line(`Round ${round} - re-diagnosing...`, 'info')
         await delay(700)
       }
 
@@ -315,7 +315,7 @@ export async function runLabAssist(labId: string) {
       break
     }
     if (round < 3) {
-      line(`⚠ ${passing}/${matrixAfter.length} tests passing — re-diagnosing...`, 'warn')
+      line(`⚠ ${passing}/${matrixAfter.length} tests passing - re-diagnosing...`, 'warn')
       await delay(800)
     }
     }
@@ -342,7 +342,7 @@ export async function runLabAssist(labId: string) {
       // Keep the takeover phase at 'summary' so the overlay typewrites the
       // explanation, then the overlay itself moves to 'complete' and redirects.
       net.completeLab(labId, true)
-      push(`✅ Verification passed — all ${matrixAfter.length} connectivity tests are green.\n\n${formatMatrix(matrixAfter)}`)
+      push(`✅ Verification passed - all ${matrixAfter.length} connectivity tests are green.\n\n${formatMatrix(matrixAfter)}`)
       store.setTakeoverSummary(
         [
           `🤖 AI completed the lab.`,
@@ -370,7 +370,7 @@ export async function runLabAssist(labId: string) {
           `I dug into "${lab.title}" and got ${passingNow}/${matrixAfter.length} tests passing, but ran out of safe automatic fixes.`,
           '',
           'What I fixed along the way:',
-          ...(applied.length ? applied.map((c) => `✅ ${c.summary}`) : ['— nothing was safely automatable']),
+          ...(applied.length ? applied.map((c) => `✅ ${c.summary}`) : ['- nothing was safely automatable']),
           '',
           'Current results:',
           formatMatrix(matrixAfter),
@@ -380,7 +380,7 @@ export async function runLabAssist(labId: string) {
       )
     }
   } catch (error) {
-    // Stale run (lab switched / assist exited) — silently abort, never touch
+    // Stale run (lab switched / assist exited) - silently abort, never touch
     // the state of whatever lab is active now.
     if (error === STALE) return
     store.setTakeoverPhase('idle')

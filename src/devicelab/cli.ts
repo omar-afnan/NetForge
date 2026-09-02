@@ -1,5 +1,5 @@
 /**
- * Device Lab — a small, self-contained Cisco-style IOS CLI engine used by the
+ * Device Lab - a small, self-contained Cisco-style IOS CLI engine used by the
  * guided configuration lessons. It models the subset of IOS that NetForge
  * teaches: CLI modes, hostname, passwords, interfaces, IP addressing,
  * static/default routes, VLANs, switchports and running/startup config.
@@ -53,7 +53,7 @@ export interface CliDevice {
   currentVlan: number | null
   awaitingPassword: boolean
   badSecrets: number
-  /** Every command line entered this session — lessons validate against it. */
+  /** Every command line entered this session - lessons validate against it. */
   history: string[]
 }
 
@@ -189,7 +189,7 @@ function showRoutes(device: CliDevice): string[] {
 }
 
 /**
- * Execute one CLI line against the device state (mutates the state object —
+ * Execute one CLI line against the device state (mutates the state object -
  * callers pass a draft). Returns output lines.
  */
 export function executeCommand(device: CliDevice, raw: string): { lines: string[]; tone: 'out' | 'err' | 'ok' } {

@@ -19,7 +19,7 @@ const DEVICE_TYPES: { type: DeviceType; label: string; icon: string }[] = [
 
 const TOOL_HINTS: Record<string, string> = {
   select: 'Drag devices to move them · click a device or cable to inspect · Del removes',
-  wire: 'Click the first device, then the second — pick a cable type below',
+  wire: 'Click the first device, then the second - pick a cable type below',
   delete: 'Click any device or cable to remove it',
   place: 'Click on the canvas to place the selected device',
 }

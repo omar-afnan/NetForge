@@ -125,7 +125,7 @@ export function IssueTracker() {
     [primaryDevice, devices, links],
   )
 
-  // A suggested fix only appears once the student has investigated — run at
+  // A suggested fix only appears once the student has investigated - run at
   // least two tools or committed to a hypothesis. Always derived live via
   // the assistant's own diagnose engine (no answer keys).
   const suggestedFix = useMemo<ProposedChange | null>(() => {
@@ -139,7 +139,7 @@ export function IssueTracker() {
     if (allPass && status !== 'resolved') setStatus('resolved')
   }, [allPass, status])
 
-  /* ── Actions — every one drives the REAL simulator/stores ───── */
+  /* ── Actions - every one drives the REAL simulator/stores ───── */
 
   const noteInvestigation = () => {
     investigationCount.current += 1
@@ -173,10 +173,10 @@ export function IssueTracker() {
       setHighlightedDevice(primaryDevice.id)
       window.setTimeout(() => setHighlightedDevice(null), 1600)
       pushResult(
-        `PING ${destination} — ${okCount}/${times} replies`,
+        `PING ${destination} - ${okCount}/${times} replies`,
         okCount === times,
         [
-          okCount === times ? `✓ Reply received (${lastDetail})` : `✗ Request timed out — ${lastDetail}`,
+          okCount === times ? `✓ Reply received (${lastDetail})` : `✗ Request timed out - ${lastDetail}`,
           lastHops.length ? `Path: ${lastHops.join(' → ')}` : '',
           `Sent: ${times}   Received: ${okCount}   Lost: ${times - okCount}`,
         ].filter(Boolean),
@@ -237,10 +237,10 @@ export function IssueTracker() {
       const passing = fresh.filter((t) => t.success).length
       const failingRows = fresh.filter((t) => !t.success)
       pushResult(
-        `NETWORK RE-SCAN — ${passing}/${fresh.length} connectivity tests passing`,
+        `NETWORK RE-SCAN - ${passing}/${fresh.length} connectivity tests passing`,
         failingRows.length === 0,
         failingRows.length
-          ? failingRows.slice(0, 8).map((t) => `✗ ${t.source} → ${t.destination} — ${t.detail}`)
+          ? failingRows.slice(0, 8).map((t) => `✗ ${t.source} → ${t.destination} - ${t.detail}`)
           : ['✓ All endpoint pairs reachable'],
       )
       setScanning(false)
@@ -253,7 +253,7 @@ export function IssueTracker() {
     noteInvestigation()
     const feedback = evaluateHypothesis(hypothesis, evidence)
     setHypothesisFeedback(
-      feedback.text + (feedback.suggestedTest ? `\n\nNow prove it — try: ${feedback.suggestedTest}` : ''),
+      feedback.text + (feedback.suggestedTest ? `\n\nNow prove it - try: ${feedback.suggestedTest}` : ''),
     )
   }
 
@@ -287,12 +287,12 @@ export function IssueTracker() {
       id: crypto.randomUUID(),
       role: 'assistant',
       kind: 'text',
-      text: '🤖 Taking over the investigation — watch the live topology overlay. You can keep typing questions here while I work.',
+      text: '🤖 Taking over the investigation - watch the live topology overlay. You can keep typing questions here while I work.',
     })
     void runLabAssist(lab.id)
   }
 
-  /* ── Fix + verification — the real lab tests decide ─────────── */
+  /* ── Fix + verification - the real lab tests decide ─────────── */
 
   const applyFix = () => {
     if (!suggestedFix) return
@@ -355,7 +355,7 @@ export function IssueTracker() {
         setStatus('resolved')
       }
       pushResult(
-        `VERIFICATION — ${passing}/${finalMatrix.length} connectivity tests passing`,
+        `VERIFICATION - ${passing}/${finalMatrix.length} connectivity tests passing`,
         resolved,
         finalMatrix.map((t) => `${t.success ? '✓' : '✗'} ${t.source} → ${t.destination}`),
       )
@@ -399,7 +399,7 @@ export function IssueTracker() {
           </div>
           <div className="mt-2 flex items-center gap-2">
             <span className="font-data text-[13px] font-semibold text-[var(--text-primary)]">
-              {primaryDevice?.hostname ?? '—'}
+              {primaryDevice?.hostname ?? '-'}
             </span>
             <span className="text-[12px] text-[var(--text-secondary)]">
               {status === 'resolved'
@@ -439,7 +439,7 @@ export function IssueTracker() {
                 </div>
                 <div className="mt-2 text-[11px] text-[var(--text-secondary)]">
                   {failurePoint.failedHopIndex !== null
-                    ? `Traffic stops at ${failurePoint.hops[failurePoint.failedHopIndex].device}${failurePoint.reason ? ` — ${failurePoint.reason}` : ''}`
+                    ? `Traffic stops at ${failurePoint.hops[failurePoint.failedHopIndex].device}${failurePoint.reason ? ` - ${failurePoint.reason}` : ''}`
                     : 'No failure on this path right now.'}
                 </div>
                 <button
@@ -530,7 +530,7 @@ export function IssueTracker() {
                 disabled: !primaryDevice,
                 run: () =>
                   showReport(
-                    `ARP table — ${primaryDevice!.hostname}`,
+                    `ARP table - ${primaryDevice!.hostname}`,
                     simulator.getARPTable(primaryDevice!.hostname).map((e) => `${e.ipAddress} → ${e.macAddress} (${e.interfaceName})`),
                   ),
               },
@@ -540,7 +540,7 @@ export function IssueTracker() {
                 disabled: !primaryDevice,
                 run: () =>
                   showReport(
-                    `Routing table — ${primaryDevice!.hostname}`,
+                    `Routing table - ${primaryDevice!.hostname}`,
                     simulator.getRoutingTable(primaryDevice!.hostname).map((r) => `${r.destination}/${r.mask} ${r.nextHop ? `via ${r.nextHop}` : 'connected'} [${r.status}]`),
                   ),
               },
@@ -550,7 +550,7 @@ export function IssueTracker() {
                 disabled: !primaryDevice,
                 run: () =>
                   showReport(
-                    `Interfaces — ${primaryDevice!.hostname}`,
+                    `Interfaces - ${primaryDevice!.hostname}`,
                     primaryDevice!.interfaces.map((i) => `${i.name}  ${i.status}  ${i.ipAddress ?? 'unassigned'} ${i.subnetMask ?? ''}`),
                   ),
               },
@@ -624,7 +624,7 @@ export function IssueTracker() {
           )}
         </Section>
 
-        {/* 7 · AI ASSISTANCE — progressive, non-blocking */}
+        {/* 7 · AI ASSISTANCE - progressive, non-blocking */}
         <Section title="NetForge AI" icon={Sparkles}>
           <div className="flex flex-wrap gap-2">
             <button
@@ -649,7 +649,7 @@ export function IssueTracker() {
                   id: crypto.randomUUID(),
                   role: 'assistant',
                   kind: 'text',
-                  text: 'Ask me anything in the chat on the right — I can see the live topology and can run diagnostics for you.',
+                  text: 'Ask me anything in the chat on the right - I can see the live topology and can run diagnostics for you.',
                 })
               }
             >
@@ -671,7 +671,7 @@ export function IssueTracker() {
           )}
         </Section>
 
-        {/* 9 · SUGGESTED FIX — only after real investigation */}
+        {/* 9 · SUGGESTED FIX - only after real investigation */}
         {suggestedFix && (
           <Section title="Suggested Fix" icon={Wrench}>
             <div className="font-data text-[12px] text-[var(--text-primary)]">{suggestedFix.summary}</div>
@@ -697,7 +697,7 @@ export function IssueTracker() {
           </Section>
         )}
 
-        {/* 10 · VERIFICATION — real simulator tests only */}
+        {/* 10 · VERIFICATION - real simulator tests only */}
         {(verification || status !== 'investigating') && (
           <Section title="Verification" icon={ShieldCheck}>
             {verification ? (
@@ -718,12 +718,12 @@ export function IssueTracker() {
                   <div className="mt-2 flex items-center gap-2 border border-[var(--status-up)] bg-[rgba(22,163,74,0.08)] px-3 py-2">
                     <CheckCircle2 className="h-4 w-4 text-[var(--status-up)]" strokeWidth={1.75} />
                     <span className="text-[12px] font-semibold text-[var(--status-up)]">
-                      ALL TESTS PASSED — 🎉 ISSUE RESOLVED
+                      ALL TESTS PASSED - 🎉 ISSUE RESOLVED
                     </span>
                   </div>
                 ) : (
                   <div className="mt-2 text-[11px] text-[var(--text-secondary)]">
-                    Not all tests pass yet — keep investigating.
+                    Not all tests pass yet - keep investigating.
                   </div>
                 )}
                 <button
@@ -737,7 +737,7 @@ export function IssueTracker() {
               </div>
             ) : (
               <div className="text-[11px] text-[var(--text-dim)]">
-                Apply a fix (or fix it yourself), then run verification — the lab only counts as resolved when
+                Apply a fix (or fix it yourself), then run verification - the lab only counts as resolved when
                 every real connectivity test passes.
               </div>
             )}

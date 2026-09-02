@@ -31,7 +31,7 @@ export function handleDiagnose(cmd: ParsedCommand): AssistantMessage[] {
   const source = resolveDevice(cmd.deviceRef)
   if (source && cmd.targetRef) return handlePing({ ...cmd, intent: 'ping' })
   const result = scanLab()
-  if (result.problems.length === 0) return [text(`I scanned the lab — every test passes. 🎉\n\n${formatMatrix(result.matrix)}`)]
+  if (result.problems.length === 0) return [text(`I scanned the lab - every test passes. 🎉\n\n${formatMatrix(result.matrix)}`)]
   const lines = ['I found these issues:', '']
   for (const problem of result.problems.slice(0, 8)) {
     lines.push(`${problem.severity === 'critical' ? '🔴' : problem.severity === 'warning' ? '🟠' : '🔵'} ${problem.summary}`)
@@ -40,7 +40,7 @@ export function handleDiagnose(cmd: ParsedCommand): AssistantMessage[] {
     const messages: AssistantMessage[] = [text(lines.join('\n'))]
   if (result.plan.length > 0) {
     const repairPlan = buildPlan('Repair lab', result.problems.map((p) => p.summary), result.plan)
-    messages.push(text('The plan below fixes the root causes — nothing applied until you approve.'))
+    messages.push(text('The plan below fixes the root causes - nothing applied until you approve.'))
     messages.push(planMessage(repairPlan, 'Proposed repair plan:'))
   } else messages.push(text('These may need manual topology changes I won\'t do without your say-so.'))
   return messages
@@ -65,7 +65,7 @@ export function handleCompleteLab(): AssistantMessage[] {
   const { problems, plan, matrix } = scanLab()
   if (plan.length === 0) return [text(problems.length === 0 ? `All ${matrix.length} tests already pass. 🎉` : `Issues found, none I can safely automate:\n${problems.map((p) => `• ${p.summary}`).join('\n')}`)]
   const labPlan = buildPlan('Complete the lab', problems.slice(0, 6).map((p) => p.summary), plan)
-  const intro = [`Found ${labPlan.changes.length} change${labPlan.changes.length === 1 ? '' : 's'} required.`, '', ...labPlan.changes.map((c) => `• ${c.summary}`), '', 'Nothing applied yet — review and approve.']
+  const intro = [`Found ${labPlan.changes.length} change${labPlan.changes.length === 1 ? '' : 's'} required.`, '', ...labPlan.changes.map((c) => `• ${c.summary}`), '', 'Nothing applied yet - review and approve.']
   useCopilotStore.getState().setPendingPlan(labPlan)
   return [planMessage(labPlan, intro.join('\n'))]
 }
