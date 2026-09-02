@@ -205,8 +205,8 @@ export function DeviceExplorer({ kind, hotspots, firstLessonId, onStart, onBack 
   return (
     <div className="explorer-root">
       <div className="explorer-header">
-        <button type="button" onClick={onBack} className="explorer-back">
-          <ChevronLeft className="h-3.5 w-3.5" /> Device Lab
+        <button type="button" onClick={onBack} className="explorer-back" aria-label="Back to lessons">
+          <ChevronLeft className="h-4 w-4" />
         </button>
         <span className="explorer-header-tag">{course?.title ?? infos.name}</span>
         <span className="explorer-progress">
@@ -317,3 +317,4 @@ export function DeviceExplorer({ kind, hotspots, firstLessonId, onStart, onBack 
     </div>
   )
 }
+

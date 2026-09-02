@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { X } from 'lucide-react'
 import { InspectorPanel } from './InspectorPanel'
 import { AICopilotPanel } from './AICopilotPanel'
 
@@ -6,9 +7,11 @@ export type SidebarMode = 'inspector' | 'copilot'
 
 interface RightSidebarProps {
   defaultMode?: SidebarMode
+  /** Optional close handler - when provided, an "X" button appears in the header. */
+  onClose?: () => void
 }
 
-export function RightSidebar({ defaultMode = 'inspector' }: RightSidebarProps) {
+export function RightSidebar({ defaultMode = 'inspector', onClose }: RightSidebarProps) {
   const [mode, setMode] = useState<SidebarMode>(defaultMode)
 
   const handleModeChange = useCallback((next: SidebarMode) => {
@@ -47,6 +50,16 @@ export function RightSidebar({ defaultMode = 'inspector' }: RightSidebarProps) {
             AI Copilot
           </button>
         </div>
+        {onClose && (
+          <button
+            type="button"
+            className="ml-auto rounded p-0.5 text-[var(--text-dim)] hover:text-[var(--text-primary)]"
+            onClick={onClose}
+            aria-label="Close sidebar"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
         <div className="right-sidebar-mode-indicator" data-mode={mode} />
       </div>
 

@@ -30,12 +30,12 @@ function HomePage({ onOpen }: { onOpen: (kind: DeviceKind) => void }) {
   return (
     <div className="flex h-full flex-col overflow-auto">
       <div className="panel-header">Device Lab</div>
-      <div className="mx-auto w-full max-w-4xl p-6">
-        <h1 className="text-lg font-bold text-[var(--text-primary)]">Learn how real network devices are configured.</h1>
-        <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
+      <div className="mx-auto w-full max-w-4xl p-3">
+        <h1 className="text-base font-bold text-[var(--text-primary)]">Learn how real network devices are configured.</h1>
+        <p className="mt-0.5 text-[12px] text-[var(--text-secondary)]">
           Guided, hands-on configuration lessons on simulated devices. Choose a device to begin - your progress is saved locally.
         </p>
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
           {COURSES.map((course) => {
             const Icon = COURSE_ICONS[course.kind]
             const lessons = allLessons(course)
@@ -45,19 +45,19 @@ function HomePage({ onOpen }: { onOpen: (kind: DeviceKind) => void }) {
                 key={course.kind}
                 type="button"
                 onClick={() => onOpen(course.kind)}
-                className="group border border-[var(--border)] bg-[var(--bg-elevated)] p-5 text-left transition-all hover:border-[var(--accent-link)]"
+                className="group rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] p-3 text-left transition-all hover:border-[var(--accent-link)] hover:shadow-sm"
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center border border-[var(--border-bright)] bg-[var(--bg-inset)]">
-                    <Icon className="h-5 w-5 text-[var(--accent-link)]" strokeWidth={1.5} />
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-bright)] bg-[var(--bg-inset)]">
+                    <Icon className="h-4 w-4 text-[var(--accent-link)]" strokeWidth={1.75} />
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-[var(--text-primary)]">{course.title}</div>
-                    <div className="text-[11px] text-[var(--text-dim)]">{course.subtitle}</div>
+                    <div className="text-[13px] font-bold text-[var(--text-primary)]">{course.title}</div>
+                    <div className="text-[10.5px] text-[var(--text-dim)]">{course.subtitle}</div>
                   </div>
                 </div>
-                <p className="mt-3 text-[12px] text-[var(--text-secondary)]">{course.blurb}</p>
-                <div className="mt-4">
+                <p className="mt-2 text-[11.5px] leading-snug text-[var(--text-secondary)]">{course.blurb}</p>
+                <div className="mt-2.5">
                   <ProgressBar done={done} total={lessons.length} />
                 </div>
               </button>
@@ -80,39 +80,39 @@ function LessonListPage({ kind, onBack, onOpen, onExplore }: { kind: DeviceKind;
   return (
     <div className="flex h-full flex-col overflow-auto">
       <div className="panel-header flex items-center gap-2">
-        <button type="button" onClick={onBack} className="flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-          <ChevronLeft className="h-3.5 w-3.5" /> Device Lab
+        <button type="button" onClick={onBack} className="flex items-center text-[var(--text-secondary)] hover:text-[var(--text-primary)]" aria-label="Back to Device Lab">
+          <ChevronLeft className="h-4 w-4" />
         </button>
         <span className="text-[var(--text-dim)]">/</span>
         <span>{course.title}</span>
         <span className="ml-auto font-data text-[10px] text-[var(--accent-link)]">{done}/{lessons.length}</span>
       </div>
-      <div className="mx-auto w-full max-w-3xl p-6">
-        <h1 className="text-lg font-bold text-[var(--text-primary)]">{course.title}</h1>
-        <p className="mt-1 text-[12px] text-[var(--text-secondary)]">{course.blurb}</p>
-        <div className="mt-4">
+      <div className="mx-auto w-full max-w-3xl p-3">
+        <h1 className="text-base font-bold text-[var(--text-primary)]">{course.title}</h1>
+        <p className="mt-0.5 text-[12px] text-[var(--text-secondary)]">{course.blurb}</p>
+        <div className="mt-2.5">
           <ProgressBar done={done} total={lessons.length} />
         </div>
-        <div className="mt-5 flex flex-wrap items-center gap-3">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={onExplore}
-            className="border border-[var(--accent-link)] bg-[var(--accent-link)]/10 px-4 py-2 text-[12px] font-semibold text-[var(--accent-link)] transition-colors hover:bg-[var(--accent-link)]/20"
+            className="rounded-md border border-[var(--accent-link)] bg-[var(--accent-link)]/10 px-3 py-1.5 text-[11.5px] font-semibold text-[var(--accent-link)] transition-colors hover:bg-[var(--accent-link)]/20"
           >
             Explore the {course.title.replace('Course', '').trim()} first
           </button>
           <button
             type="button"
             onClick={() => onOpen(lessons[0]?.id ?? '')}
-            className="border border-[var(--border)] px-4 py-2 text-[12px] text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+            className="rounded-md border border-[var(--border)] px-3 py-1.5 text-[11.5px] text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
           >
             Skip Introduction
           </button>
         </div>
         {course.sections.map((section) => (
-          <div key={section.label} className="mt-6">
-            <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{section.label}</div>
-            <div className="border border-[var(--border)]">
+          <div key={section.label} className="mt-4">
+            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">{section.label}</div>
+            <div className="overflow-hidden rounded-md border border-[var(--border)]">
               {section.lessons.map((lesson) => {
                 const completed = progress[kind].includes(lesson.id)
                 const locked = lockedEncountered && !completed
@@ -123,7 +123,7 @@ function LessonListPage({ kind, onBack, onOpen, onExplore }: { kind: DeviceKind;
                     type="button"
                     disabled={locked}
                     onClick={() => onOpen(lesson.id)}
-                    className={`flex w-full items-center gap-3 border-b border-[var(--border)] px-4 py-3 text-left last:border-b-0 transition-colors ${
+                    className={`flex w-full items-center gap-2.5 border-b border-[var(--border)] px-3 py-2.5 text-left last:border-b-0 transition-colors ${
                       locked ? 'cursor-not-allowed opacity-40' : 'hover:bg-[var(--bg-elevated)]'
                     }`}
                   >
@@ -175,11 +175,11 @@ function ConsolePanel({ kind, device }: { kind: 'router' | 'switch'; device: Cli
 
   const awaiting = device.awaitingPassword
   return (
-    <div className="flex min-h-0 flex-1 flex-col border border-[var(--border)] bg-[#0b1220]">
-      <div className="border-b border-[var(--border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-[var(--border)] bg-[#0b1220]">
+      <div className="border-b border-[var(--border)] px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">
         Console
       </div>
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto p-3 font-mono text-[11.5px] leading-relaxed">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto p-2.5 font-mono text-[11px] leading-relaxed">
         {lines.map((line) => (
           <div
             key={line.id}
@@ -194,8 +194,8 @@ function ConsolePanel({ kind, device }: { kind: 'router' | 'switch'; device: Cli
           </div>
         ))}
       </div>
-      <div className="flex items-center gap-2 border-t border-[var(--border)] px-3 py-2">
-        <span className="shrink-0 font-mono text-[11.5px] text-[var(--accent-link)]">{awaiting ? 'Password:' : ''}</span>
+      <div className="flex items-center gap-2 border-t border-[var(--border)] px-3 py-1.5">
+        <span className="shrink-0 font-mono text-[11px] text-[var(--accent-link)]">{awaiting ? 'Password:' : ''}</span>
         <input
           type="text"
           value={input}
@@ -206,9 +206,9 @@ function ConsolePanel({ kind, device }: { kind: 'router' | 'switch'; device: Cli
           placeholder={awaiting ? '' : 'type a command…'}
           spellCheck={false}
           autoComplete="off"
-          className="w-full bg-transparent font-mono text-[11.5px] text-slate-100 outline-none placeholder:text-slate-600"
+          className="w-full bg-transparent font-mono text-[11px] text-slate-100 outline-none placeholder:text-slate-600"
         />
-        <button type="button" onClick={submit} className="shrink-0 border border-[var(--border-bright)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+        <button type="button" onClick={submit} className="shrink-0 rounded border border-[var(--border-bright)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
           Enter
         </button>
       </div>
@@ -218,18 +218,18 @@ function ConsolePanel({ kind, device }: { kind: 'router' | 'switch'; device: Cli
 
 function CliDevicePanel({ kind, device }: { kind: 'router' | 'switch'; device: CliDevice }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="flex items-center gap-3 border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
-        <div className="flex h-12 w-12 items-center justify-center border border-[var(--border-bright)] bg-[var(--bg-inset)]">
-          {kind === 'router' ? <Network className="h-6 w-6 text-[var(--accent-link)]" strokeWidth={1.5} /> : <Cpu className="h-6 w-6 text-[var(--accent-amber)]" strokeWidth={1.5} />}
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div className="flex items-center gap-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] p-2.5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-md border border-[var(--border-bright)] bg-[var(--bg-inset)]">
+          {kind === 'router' ? <Network className="h-5 w-5 text-[var(--accent-link)]" strokeWidth={1.5} /> : <Cpu className="h-5 w-5 text-[var(--accent-amber)]" strokeWidth={1.5} />}
         </div>
         <div>
-          <div className="font-mono text-sm font-bold text-[var(--text-primary)]">{device.hostname}</div>
+          <div className="font-mono text-[13px] font-bold text-[var(--text-primary)]">{device.hostname}</div>
           <div className="text-[10px] uppercase tracking-widest text-[var(--text-dim)]">{kind === 'router' ? 'Router' : 'Switch'}</div>
         </div>
-        <div className="ml-auto flex flex-wrap justify-end gap-1.5">
+        <div className="ml-auto flex flex-wrap justify-end gap-1">
           {device.interfaces.map((iface) => (
-            <div key={iface.name} className="border border-[var(--border)] px-2 py-1 text-center">
+            <div key={iface.name} className="rounded-sm border border-[var(--border)] px-1.5 py-0.5 text-center">
               <div className="font-mono text-[10px] text-[var(--text-secondary)]">{iface.short}</div>
               <div className="font-mono text-[9px] text-[var(--text-dim)]">{iface.ip ? `${iface.ip}/${maskShort(iface.mask)}` : 'no IP'}</div>
               <div className={`font-mono text-[9px] ${iface.status === 'up' ? 'text-[var(--status-up)]' : 'text-red-400'}`}>
@@ -261,48 +261,48 @@ function EndpointPanel({ kind, device, onInspected }: { kind: 'server' | 'pc'; d
 
   const isServer = kind === 'server'
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto">
-      <div className="flex items-center gap-3 border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
-        <div className="flex h-12 w-12 items-center justify-center border border-[var(--border-bright)] bg-[var(--bg-inset)]">
-          {isServer ? <Server className="h-6 w-6 text-[var(--accent-link)]" strokeWidth={1.5} /> : <Monitor className="h-6 w-6 text-[var(--accent-amber)]" strokeWidth={1.5} />}
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto">
+      <div className="flex items-center gap-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] p-2.5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-md border border-[var(--border-bright)] bg-[var(--bg-inset)]">
+          {isServer ? <Server className="h-5 w-5 text-[var(--accent-link)]" strokeWidth={1.5} /> : <Monitor className="h-5 w-5 text-[var(--accent-amber)]" strokeWidth={1.5} />}
         </div>
         <div>
-          <div className="font-mono text-sm font-bold text-[var(--text-primary)]">{device.hostname}</div>
+          <div className="font-mono text-[13px] font-bold text-[var(--text-primary)]">{device.hostname}</div>
           <div className={`font-mono text-[10px] ${device.ip && device.gateway ? 'text-[var(--status-up)]' : 'text-red-400'}`}>
             ● {device.ip && device.gateway ? 'Connected' : 'Not configured'}
           </div>
         </div>
       </div>
 
-      <div className="border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
-        <div className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Network</div>
+      <div className="rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] p-3">
+        <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Network</div>
         {([
           ['ip', 'IPv4 Address'],
           ['mask', 'Subnet Mask'],
           ['gateway', 'Default Gateway'],
           ['dns', 'DNS'],
         ] as const).map(([field, label]) => (
-          <label key={field} className="mb-2 block">
-            <span className="mb-1 block text-[11px] text-[var(--text-secondary)]">{label}</span>
+          <label key={field} className="mb-1.5 block">
+            <span className="mb-0.5 block text-[11px] text-[var(--text-secondary)]">{label}</span>
             <input
               type="text"
               value={form[field]}
               onChange={(e) => setForm({ ...form, [field]: e.target.value })}
               placeholder="0.0.0.0"
               spellCheck={false}
-              className="w-full border border-[var(--border)] bg-[var(--bg-inset)] px-2 py-1.5 font-mono text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-link)]"
+              className="w-full rounded border border-[var(--border)] bg-[var(--bg-inset)] px-2 py-1.5 font-mono text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-link)]"
             />
           </label>
         ))}
         <button
           type="button"
           onClick={() => setErrors(setEndpoint(kind, form))}
-          className="mt-1 w-full border border-[var(--accent-link)] bg-[var(--accent-link)]/10 px-3 py-2 text-[12px] font-semibold text-[var(--accent-link)] hover:bg-[var(--accent-link)]/20"
+          className="mt-1 w-full rounded-md border border-[var(--accent-link)] bg-[var(--accent-link)]/10 px-3 py-1.5 text-[11.5px] font-semibold text-[var(--accent-link)] hover:bg-[var(--accent-link)]/20"
         >
           Apply Configuration
         </button>
         {errors.length > 0 && (
-          <div className="mt-2 border border-red-500/40 bg-red-500/10 p-2 text-[11px] text-red-300">
+          <div className="mt-1.5 rounded border border-red-500/40 bg-red-500/10 p-2 text-[11px] text-red-300">
             {errors.map((err) => <div key={err}>✗ {err}</div>)}
           </div>
         )}
@@ -312,12 +312,12 @@ function EndpointPanel({ kind, device, onInspected }: { kind: 'server' | 'pc'; d
             setShowDetails(!showDetails)
             if (!showDetails) onInspected()
           }}
-          className="mt-3 text-[11px] text-[var(--text-dim)] underline hover:text-[var(--text-secondary)]"
+          className="mt-2.5 text-[11px] text-[var(--text-dim)] underline hover:text-[var(--text-secondary)]"
         >
           {showDetails ? 'Hide' : 'Show'} Interface Details
         </button>
         {showDetails && (
-          <div className="mt-2 border border-[var(--border)] bg-[var(--bg-inset)] p-2 font-mono text-[10.5px] text-[var(--text-secondary)]">
+          <div className="mt-1.5 rounded border border-[var(--border)] bg-[var(--bg-inset)] p-2 font-mono text-[10.5px] text-[var(--text-secondary)]">
             <div>Interface: Ethernet0 (1000 Mbps, full duplex)</div>
             <div>MAC: 00:1B:44:11:3A:{kind === 'server' ? 'B7' : 'C4'}</div>
             <div>MTU: 1500 · DHCP: off (static)</div>
@@ -340,27 +340,27 @@ function ConnectivityPanel({ kind, pingDest, setPingDest, lastPing, setLastPing,
   pingEndpoint: (kind: 'server' | 'pc', destination: string) => { ok: boolean; destination: string; detail: string }
 }) {
   return (
-    <div className="border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
-      <div className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Connectivity</div>
-      <div className="flex gap-2">
+    <div className="rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] p-3">
+      <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Connectivity</div>
+      <div className="flex gap-1.5">
         <input
           type="text"
           value={pingDest}
           onChange={(e) => setPingDest(e.target.value)}
           placeholder="192.168.1.1"
           spellCheck={false}
-          className="w-full border border-[var(--border)] bg-[var(--bg-inset)] px-2 py-1.5 font-mono text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-link)]"
+          className="w-full rounded border border-[var(--border)] bg-[var(--bg-inset)] px-2 py-1.5 font-mono text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-link)]"
         />
         <button
           type="button"
           onClick={() => setLastPing(pingEndpoint(kind, pingDest.trim()))}
-          className="shrink-0 border border-[var(--border-bright)] px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          className="shrink-0 rounded-md border border-[var(--border-bright)] px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
         >
           Run Ping
         </button>
       </div>
       {lastPing && (
-        <div className={`mt-2 border p-2 font-mono text-[11px] ${lastPing.ok ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : 'border-red-500/40 bg-red-500/10 text-red-300'}`}>
+        <div className={`mt-1.5 rounded border p-2 font-mono text-[11px] ${lastPing.ok ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : 'border-red-500/40 bg-red-500/10 text-red-300'}`}>
           {lastPing.ok ? `✓ Reply from ${lastPing.destination} - ${lastPing.detail}` : `✗ Ping to ${lastPing.destination} failed - ${lastPing.detail}`}
         </div>
       )}
@@ -375,9 +375,9 @@ function ServicesPanel({ isServer, device, toggleService }: {
 }) {
   if (!isServer) return null
   return (
-    <div className="border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Services</div>
-      <div className="mb-3 text-[10px] text-[var(--text-dim)]">These services are visual simulations - no real sockets are opened.</div>
+    <div className="rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] p-3">
+      <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Services</div>
+      <div className="mb-2 text-[10px] leading-snug text-[var(--text-dim)]">These services are visual simulations - no real sockets are opened.</div>
       {([
         ['web', 'Web Server (HTTP)'],
         ['dns', 'DNS Server'],
@@ -387,7 +387,7 @@ function ServicesPanel({ isServer, device, toggleService }: {
           key={svc}
           type="button"
           onClick={() => toggleService('server', svc)}
-          className={`mb-1.5 flex w-full items-center justify-between border px-3 py-2 text-[12px] transition-colors ${
+          className={`mb-1 flex w-full items-center justify-between rounded-md border px-2.5 py-1.5 text-[11.5px] transition-colors ${
             device.services[svc]
               ? 'border-[var(--status-up)] text-[var(--status-up)]'
               : 'border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--border-bright)]'
@@ -411,6 +411,9 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
 }) {
   const found = findLesson(kind, lessonId)
   const store = useDeviceLabStore()
+  // When the user presses "Ask Copilot" we flip a flag in the UI store so
+  // App.tsx opens the right sidebar in Copilot mode for this lesson.
+  const setDeviceLabCopilotRequested = useUIStore((s) => s.setDeviceLabCopilotRequested)
   const [hintLevel, setHintLevel] = useState(0) // 0 none, 1 hint, 2 solution
   const [feedback, setFeedback] = useState<string | null>(null)
   const [completed, setCompleted] = useState(false)
@@ -465,6 +468,7 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
   }
 
   const askCopilot = () => {
+    setDeviceLabCopilotRequested(true)
     handleMessage(
       `I'm in the Device Lab lesson "${lesson.title}" (task: ${lesson.objective}). ` +
       `Can you explain the concepts I need here, without configuring anything for me?`,
@@ -482,8 +486,8 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="panel-header flex items-center gap-2">
-        <button type="button" onClick={onBack} className="flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-          <ChevronLeft className="h-3.5 w-3.5" /> {course.title}
+        <button type="button" onClick={onBack} className="flex items-center text-[var(--text-secondary)] hover:text-[var(--text-primary)]" aria-label="Back to lessons">
+          <ChevronLeft className="h-4 w-4" />
         </button>
         <span className="text-[var(--text-dim)]">/</span>
         <span>{lesson.title}</span>
@@ -492,21 +496,21 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-2">
         {/* LEFT - instructions */}
-        <div className="min-h-0 overflow-auto border-r border-[var(--border)] p-5">
+        <div className="min-h-0 overflow-auto border-r border-[var(--border)] p-3">
           <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Lesson</div>
-          <h2 className="mt-1 text-base font-bold text-[var(--text-primary)]">{lesson.title}</h2>
-          <p className="mt-1 text-[12px] text-[var(--text-secondary)]">{lesson.description}</p>
+          <h2 className="mt-0.5 text-[15px] font-bold text-[var(--text-primary)]">{lesson.title}</h2>
+          <p className="mt-0.5 text-[12px] leading-snug text-[var(--text-secondary)]">{lesson.description}</p>
 
-          <div className="mt-5 border-t border-[var(--border)] pt-4">
+          <div className="mt-3 border-t border-[var(--border)] pt-2.5">
             <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Objective</div>
-            <p className="mt-1 text-[13px] text-[var(--text-primary)]">{lesson.objective}</p>
+            <p className="mt-0.5 text-[12.5px] leading-snug text-[var(--text-primary)]">{lesson.objective}</p>
           </div>
 
-          <div className="mt-4 border-t border-[var(--border)] pt-4">
+          <div className="mt-3 border-t border-[var(--border)] pt-2.5">
             <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">What you'll learn</div>
-            <ul className="mt-1.5 space-y-1">
+            <ul className="mt-1 space-y-0.5">
               {lesson.learn.map((item) => (
-                <li key={item} className="flex items-start gap-2 text-[12px] text-[var(--text-secondary)]">
+                <li key={item} className="flex items-start gap-1.5 text-[11.5px] leading-snug text-[var(--text-secondary)]">
                   <span className="mt-0.5 text-[var(--accent-link)]">•</span> {item}
                 </li>
               ))}
@@ -514,64 +518,64 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
           </div>
 
           {hintLevel >= 1 && (
-            <div className="mt-4 border border-[var(--border-bright)] bg-[var(--bg-elevated)] p-3">
+            <div className="mt-3 rounded-md border border-[var(--border-bright)] bg-[var(--bg-elevated)] p-2.5">
               <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--accent-amber)]">
                 <Lightbulb className="h-3 w-3" /> Hint
               </div>
-              <p className="mt-1 text-[12px] text-[var(--text-secondary)]">{lesson.hint}</p>
+              <p className="mt-0.5 text-[11.5px] leading-snug text-[var(--text-secondary)]">{lesson.hint}</p>
             </div>
           )}
           {hintLevel >= 2 && (
-            <div className="mt-2 border border-[var(--border-bright)] bg-[var(--bg-elevated)] p-3">
+            <div className="mt-2 rounded-md border border-[var(--border-bright)] bg-[var(--bg-elevated)] p-2.5">
               <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Solution</div>
-              <pre className="mt-1 whitespace-pre-wrap font-mono text-[11px] text-[var(--text-primary)]">{lesson.solution}</pre>
+              <pre className="mt-0.5 whitespace-pre-wrap font-mono text-[11px] leading-snug text-[var(--text-primary)]">{lesson.solution}</pre>
             </div>
           )}
 
           {feedback && !completed && (
-            <div className="mt-4 border border-red-500/40 bg-red-500/10 p-3">
+            <div className="mt-3 rounded-md border border-red-500/40 bg-red-500/10 p-2.5">
               <div className="text-[10px] font-semibold uppercase tracking-widest text-red-300">Not quite</div>
-              <p className="mt-1 whitespace-pre-line text-[12px] text-red-200">{feedback}</p>
+              <p className="mt-0.5 whitespace-pre-line text-[11.5px] leading-snug text-red-200">{feedback}</p>
             </div>
           )}
 
           {completed ? (
-            <div className="mt-4 border border-[var(--status-up)]/50 bg-[var(--status-up)]/10 p-4">
+            <div className="mt-3 rounded-md border border-[var(--status-up)]/50 bg-[var(--status-up)]/10 p-3">
               <div className="text-[12px] font-bold text-[var(--status-up)]">✓ Task completed</div>
-              <p className="mt-1 text-[12px] text-[var(--text-secondary)]">The simulated device state genuinely passes this lesson's checks.</p>
+              <p className="mt-0.5 text-[11.5px] leading-snug text-[var(--text-secondary)]">The simulated device state genuinely passes this lesson's checks.</p>
               {next && (
                 <button
                   type="button"
                   onClick={() => onOpenLesson(next.id)}
-                  className="mt-3 border border-[var(--accent-link)] bg-[var(--accent-link)]/10 px-4 py-2 text-[12px] font-semibold text-[var(--accent-link)] hover:bg-[var(--accent-link)]/20"
+                  className="mt-2.5 rounded-md border border-[var(--accent-link)] bg-[var(--accent-link)]/10 px-3 py-1.5 text-[11.5px] font-semibold text-[var(--accent-link)] hover:bg-[var(--accent-link)]/20"
                 >
                   Continue → {next.title}
                 </button>
               )}
             </div>
           ) : (
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-1.5">
               <button
                 type="button"
                 onClick={check}
-                className="border border-[var(--accent-link)] bg-[var(--accent-link)]/10 px-4 py-2 text-[12px] font-semibold text-[var(--accent-link)] hover:bg-[var(--accent-link)]/20"
+                className="rounded-md border border-[var(--accent-link)] bg-[var(--accent-link)]/10 px-3 py-1.5 text-[11.5px] font-semibold text-[var(--accent-link)] hover:bg-[var(--accent-link)]/20"
               >
                 Check Configuration
               </button>
               {hintLevel < 1 && (
-                <button type="button" onClick={() => setHintLevel(1)} className="border border-[var(--border)] px-4 py-2 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                <button type="button" onClick={() => setHintLevel(1)} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-[11.5px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
                   Show Hint
                 </button>
               )}
               {hintLevel === 1 && (
-                <button type="button" onClick={() => setHintLevel(2)} className="border border-[var(--border)] px-4 py-2 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                <button type="button" onClick={() => setHintLevel(2)} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-[11.5px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
                   Show Solution
                 </button>
               )}
-              <button type="button" onClick={askCopilot} className="border border-[var(--border)] px-4 py-2 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+              <button type="button" onClick={askCopilot} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-[11.5px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
                 Ask Copilot
               </button>
-              <button type="button" onClick={hardReset} className="ml-auto border border-[var(--border)] px-3 py-2 text-[11px] text-[var(--text-dim)] hover:text-[var(--text-secondary)]">
+              <button type="button" onClick={hardReset} className="ml-auto rounded-md border border-[var(--border)] px-2.5 py-1.5 text-[10.5px] text-[var(--text-dim)] hover:text-[var(--text-secondary)]">
                 Reset device
               </button>
             </div>
@@ -579,7 +583,7 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
         </div>
 
         {/* RIGHT - the interactive device */}
-        <div className="flex min-h-0 flex-col gap-3 p-5">
+        <div className="flex min-h-0 flex-col gap-2 p-3">
           {kind === 'router' && <CliDevicePanel kind="router" device={device as CliDevice} />}
           {kind === 'switch' && <CliDevicePanel kind="switch" device={device as CliDevice} />}
           {(kind === 'server' || kind === 'pc') && (
@@ -589,7 +593,7 @@ function LessonRunner({ kind, lessonId, onBack, onOpenLesson }: {
       </div>
 
       {/* Bottom progress strip */}
-      <div className="border-t border-[var(--border)] px-5 py-2.5">
+      <div className="border-t border-[var(--border)] px-3 py-2">
         <div className="mx-auto flex max-w-4xl items-center gap-3">
           <div className="flex-1">
             <ProgressBar done={store.progress[kind].length} total={lessons.length} />

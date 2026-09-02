@@ -12,6 +12,8 @@ interface UIState {
   sidebarCollapsed: boolean
   /** Device Lab: true while a lesson (with the interactive device) is open - the right sidebar is only useful then. */
   deviceLabLessonOpen: boolean
+  /** Device Lab: true once the user pressed "Ask Copilot" so the right sidebar (Copilot mode) is shown. */
+  deviceLabCopilotRequested: boolean
   /** Deep-link request to open Device Lab directly at a lesson (e.g. "Try in Device Lab" from Learn). */
   pendingDeviceLabLesson: { kind: 'router' | 'switch' | 'server' | 'pc'; lessonId: string } | null
   topologyTool: TopologyTool
@@ -21,6 +23,7 @@ interface UIState {
   setActiveView: (view: View) => void
   toggleSidebar: () => void
   setDeviceLabLessonOpen: (open: boolean) => void
+  setDeviceLabCopilotRequested: (requested: boolean) => void
   openDeviceLabLesson: (kind: 'router' | 'switch' | 'server' | 'pc', lessonId: string) => void
   clearPendingDeviceLabLesson: () => void
   setTopologyTool: (tool: TopologyTool) => void
@@ -33,6 +36,7 @@ export const useUIStore = create<UIState>((set) => ({
   activeView: 'topology',
   sidebarCollapsed: false,
   deviceLabLessonOpen: false,
+  deviceLabCopilotRequested: false,
   pendingDeviceLabLesson: null,
   topologyTool: 'select',
   pendingDeviceType: 'pc',
@@ -41,6 +45,8 @@ export const useUIStore = create<UIState>((set) => ({
   setActiveView: (activeView) => set({ activeView }),
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
   setDeviceLabLessonOpen: (deviceLabLessonOpen) => set({ deviceLabLessonOpen }),
+  setDeviceLabCopilotRequested: (deviceLabCopilotRequested) =>
+    set({ deviceLabCopilotRequested }),
   openDeviceLabLesson: (kind, lessonId) =>
     set({ activeView: 'devicelab', pendingDeviceLabLesson: { kind, lessonId } }),
   clearPendingDeviceLabLesson: () => set({ pendingDeviceLabLesson: null }),

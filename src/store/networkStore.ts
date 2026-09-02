@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { celebrateLab } from '@/lib/celebrate'
+import { labCompletionService } from '@/features/labs/completion/completionEvents'
 import { useCopilotStore } from './copilotStore'
 
 import type {
@@ -539,19 +540,26 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
 
   clearPackets: () => set({ packets: [] }),
   setHighlightedDevice: (deviceId) => set({ highlightedDeviceId: deviceId }),
-  completeLab: (labId, aiAssisted) => {
+    completeLab: (labId, aiAssisted) => {
     const progress = { ...get().completedLabs }
     const firstCompletion = !progress[labId]?.completed
+    const completedAt = new Date().toISOString()
     progress[labId] = {
       completed: true,
-      completedAt: new Date().toISOString(),
+      completedAt,
       attempts: (progress[labId]?.attempts ?? 0) + 1,
       hintsUsed: progress[labId]?.hintsUsed ?? 0,
       aiAssisted,
     }
     set({ completedLabs: progress })
     persistLabProgress(progress)
-    if (firstCompletion) celebrateLab()
+
+    if (firstCompletion) {
+      celebrateLab()
+      // Fire an ephemeral, consumed-once completion event for the overlay.
+      // This only fires for genuinely *new* completions, not re-renders or nav.
+      labCompletionService.fire(labId, completedAt, aiAssisted)
+    }
   },
   resetLabProgress: (labId) => {
     const progress = { ...get().completedLabs }

@@ -54,16 +54,17 @@ body.glow-off {
 .panel {
   background: var(--bg-panel);
   border: 1px solid var(--border);
+  border-radius: 8px;
   box-shadow: var(--glow-panel);
 }
 
 .panel-header {
   border-bottom: 1px solid var(--border);
   background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-panel) 100%);
-  padding: 8px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
+  padding: 7px 12px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-secondary);
 }
@@ -1592,20 +1593,56 @@ body {
 
 /* ───────────────────────────────────────────── Device Explorer ───────────────────────────────────────────── */
 
-.explorer-layout {
+.explorer-layout,
+.explorer-root {
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  min-height: 0;
+  flex: 1;
+}
+
+.explorer-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.explorer-back:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-bright);
+}
+
+.explorer-header-tag {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 10.5px;
+}
+
+.explorer-progress {
+  margin-left: auto;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 10px;
+  color: var(--accent-link);
 }
 
 .explorer-header {
   border-bottom: 1px solid var(--border);
   background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-panel) 100%);
-  padding: 8px 12px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
+  padding: 7px 12px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-secondary);
   display: flex;
@@ -1637,6 +1674,8 @@ body {
   overflow: hidden;
   gap: 16px;
   padding: 16px;
+  min-height: 0;
+  align-items: stretch;
 }
 
 @media (max-width: 768px) {
@@ -1651,8 +1690,9 @@ body {
 .explorer-stage {
   position: relative;
   flex: 1;
-  min-height: 280px;
+  min-height: 380px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   background: var(--bg-elevated);
@@ -1669,8 +1709,48 @@ body {
 
 .explorer-stage svg {
   width: 100%;
+  max-width: 700px;
   height: auto;
-  max-width: 520px;
+  max-height: 420px;
+  object-fit: contain;
+}
+
+.explorer-stage-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 8px 0;
+  flex-shrink: 0;
+}
+
+.explorer-canvas {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.explorer-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 20px;
+}
+
+.explorer-done-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(22, 163, 74, 0.12);
+  border: 2px solid rgba(22, 163, 74, 0.3);
 }
 
 /* Hotspot markers */
@@ -1755,14 +1835,15 @@ body {
 
 /* Info panel */
 .explorer-panel {
-  flex: 0 0 340px;
-  max-width: 340px;
+  flex: 0 0 320px;
+  max-width: 320px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding: 16px;
 }
 
 @media (max-width: 768px) {
@@ -1787,7 +1868,7 @@ body {
 }
 
 .explorer-section {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .explorer-section-label {
@@ -1812,7 +1893,7 @@ body {
   justify-content: center;
   align-items: center;
   text-align: center;
-  padding: 16px;
+  padding: 12px;
   color: var(--text-secondary);
 }
 
@@ -1832,7 +1913,7 @@ body {
 .explorer-cta {
   display: flex;
   gap: 8px;
-  padding: 14px 8px;
+  padding: 10px 8px;
   border-top: 1px solid var(--border);
   background: var(--bg-elevated);
 }

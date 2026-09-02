@@ -93,6 +93,7 @@ function TopologyView() {
 
 function App() {
   const activeView = useUIStore((s) => s.activeView)
+  const deviceLabCopilotRequested = useUIStore((s) => s.deviceLabCopilotRequested)
   const glowEffects = useSettingsStore((s) => s.glowEffects)
   const { isSignedIn } = useAuth()
 
@@ -138,7 +139,18 @@ function App() {
     case 'devicelab':
       main = <DeviceLabView />
       bottom = undefined
-      right = undefined
+      // Show AI Copilot only after the user explicitly presses "Ask Copilot"
+      // inside the lesson - the right sidebar is otherwise closed.
+      if (deviceLabCopilotRequested) {
+        right = (
+          <Suspense fallback={null}>
+            <RightSidebar
+              defaultMode="copilot"
+              onClose={() => useUIStore.getState().setDeviceLabCopilotRequested(false)}
+            />
+          </Suspense>
+        )
+      }
       break
     case 'topology':
       main = <TopologyView />
