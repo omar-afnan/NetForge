@@ -1,159 +1,190 @@
-import { Activity, Zap, Shield, Globe, ArrowRight } from 'lucide-react'
+import { ArrowRight, Globe, Shield, Zap } from 'lucide-react'
 import { SignInButton, SignUpButton } from '@clerk/react'
+import { Button } from '@/components/ui/button'
+
+/**
+ * Signature element: the port-light strip. It's the row of link LEDs above a
+ * stack of RJ45 jacks — mostly up (green), a couple negotiating (amber), one
+ * dead (dark). It's the product's subject rendered literally, and it recurs
+ * as the brand mark. Pattern is fixed, not random: this is a specific switch.
+ */
+const PORTS = ['up', 'up', 'up', 'warn', 'up', 'up', 'down', 'up', 'warn', 'up', 'up', 'up'] as const
+
+function PortStrip({ className = '' }: { className?: string }) {
+  return (
+    <div className={`flex items-end gap-[3px] ${className}`} aria-hidden>
+      {PORTS.map((state, i) => (
+        <span
+          key={i}
+          className={state === 'warn' ? 'status-dot-active' : undefined}
+          style={{
+            width: 4,
+            height: state === 'down' ? 8 : 6 + ((i * 7) % 11),
+            background:
+              state === 'up'
+                ? 'var(--status-up)'
+                : state === 'warn'
+                  ? 'var(--status-warn)'
+                  : 'var(--border-bright)',
+            boxShadow:
+              state === 'down'
+                ? 'none'
+                : `0 0 6px ${state === 'up' ? 'var(--status-up)' : 'var(--status-warn)'}`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+const CAPABILITIES = [
+  {
+    icon: Globe,
+    tag: 'topology',
+    title: 'Live topology',
+    desc: 'Device state, links and routing rendered from the running simulator — not a static diagram.',
+  },
+  {
+    icon: Zap,
+    tag: 'diagnostics',
+    title: 'Real instruments',
+    desc: 'ping · traceroute · arp · show ip route — each computed against actual simulator state.',
+  },
+  {
+    icon: Shield,
+    tag: 'control',
+    title: 'Human in the loop',
+    desc: 'The agent proposes a fix and shows its work. Nothing touches the network until you approve.',
+  },
+]
 
 export function LandingPage() {
   return (
-    <div className="flex h-full w-full overflow-hidden bg-[var(--bg-root)]">
-      <div className="flex flex-1 flex-col justify-center px-12 lg:px-20">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center border border-[var(--border-bright)] bg-[var(--bg-elevated)]">
-            <Activity className="h-5 w-5 text-[var(--accent-link)]" strokeWidth={1.75} />
-          </div>
+    <div className="flex h-full w-full overflow-hidden bg-[var(--bg-root)] font-[family-name:var(--font-mono)] text-[var(--text-primary)]">
+      {/* ── left: the pitch ─────────────────────────────────────── */}
+      <div className="flex flex-1 flex-col justify-center overflow-y-auto px-10 py-12 lg:px-20">
+        <header className="flex items-center gap-4">
+          <PortStrip />
+          <div className="h-8 w-px bg-[var(--border)]" />
           <div>
-            <div className="text-lg font-bold tracking-wider text-[var(--text-primary)]">NETFORGE</div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-[var(--accent-link)]">
-              A network that agents can actually debug.
+            <div className="text-base font-bold tracking-[0.34em] text-[var(--text-primary)]">
+              NET<span className="text-[var(--accent-link)]">·</span>FORGE
+            </div>
+            <div className="mt-0.5 text-[10px] uppercase tracking-[0.22em] text-[var(--text-dim)]">
+              NOC console · WebMCP
             </div>
           </div>
-        </div>
+        </header>
 
-        <h1 className="max-w-2xl text-4xl font-bold leading-tight tracking-tight text-[var(--text-primary)] lg:text-5xl">
-          Agent-native network troubleshooting,{' '}
-          <span className="text-[var(--accent-link)]">live.</span>
+        <h1 className="mt-10 max-w-2xl text-[2.1rem] font-semibold leading-[1.15] tracking-tight text-[var(--text-primary)] lg:text-[2.75rem]">
+          A network that agents
+          <br />
+          can <span className="text-[var(--accent-link)]">actually</span> debug.
         </h1>
 
-        <p className="mt-6 max-w-xl text-base leading-relaxed text-[var(--text-secondary)]">
-          NetForge is a network troubleshooting laboratory where humans and AI agents collaborate
-          to inspect, diagnose, explain, repair, and verify simulated network problems  through
-          real, structured tool calls.
+        <p className="mt-6 max-w-xl font-[family-name:var(--font-sans)] text-[15px] leading-relaxed text-[var(--text-secondary)]">
+          NetForge is a troubleshooting lab where a person and an AI agent work the same broken
+          network — inspecting, diagnosing, repairing and verifying simulated faults through real,
+          structured tool calls.
         </p>
 
-        <div className="mt-8 grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-3">
-          {[
-            {
-              icon: Globe,
-              title: 'Live Topology',
-              desc: 'Interactive network maps with real device state, links, and routing.',
-            },
-            {
-              icon: Zap,
-              title: 'Real Diagnostics',
-              desc: 'Ping, traceroute, ARP, and routing analysis that compute from actual simulator state.',
-            },
-            {
-              icon: Shield,
-              title: 'Human-in-the-loop',
-              desc: 'Agents propose fixes, humans approve. No silent network changes.',
-            },
-          ].map((item) => (
-            <div
-              key={item.title}
-              className="panel p-4"
-            >
-              <item.icon className="mb-2 h-5 w-5 text-[var(--accent-link)]" strokeWidth={1.5} />
-              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]">
-                {item.title}
+        {/* instrument manifest — monospace, reads as a device banner */}
+        <dl className="mt-10 grid max-w-2xl gap-x-8 gap-y-4 sm:grid-cols-3">
+          {CAPABILITIES.map(({ icon: Icon, tag, title, desc }) => (
+            <div key={tag} className="border-t border-[var(--border)] pt-3">
+              <div className="flex items-center gap-2">
+                <Icon className="h-3.5 w-3.5 text-[var(--accent-link)]" strokeWidth={1.75} />
+                <dt className="text-[11px] uppercase tracking-[0.16em] text-[var(--text-dim)]">
+                  {tag}
+                </dt>
               </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-secondary)]">{item.desc}</p>
+              <div className="mt-2 text-sm font-medium text-[var(--text-primary)]">{title}</div>
+              <dd className="mt-1 font-[family-name:var(--font-sans)] text-[12px] leading-relaxed text-[var(--text-secondary)]">
+                {desc}
+              </dd>
             </div>
           ))}
+        </dl>
+
+        <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px] text-[var(--text-dim)]">
+          <span className="flex items-center gap-1.5">
+            <span className="pulse-dot" /> sim online
+          </span>
+          <span>react + typescript</span>
+          <span>webmcp tool surface</span>
+          <span>built for the openai / webmcp competition</span>
         </div>
 
-        <div className="mt-10 flex items-center gap-6 text-[11px] text-[var(--text-dim)]">
-          <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-up)]" />
-            WebMCP-powered
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent-link)]" />
-            React + TypeScript
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent-amber)]" />
-            Built for OpenAI / WebMCP Competition
-          </span>
-        </div>
-
-        <div className="mt-8 flex flex-col gap-3 sm:hidden">
+        {/* auth is in the right rail on desktop; inline it on narrow screens */}
+        <div className="mt-10 flex flex-col gap-2.5 lg:hidden">
           <SignUpButton mode="modal">
-            <button className="flex w-full items-center justify-center gap-2 border border-[rgba(46,200,240,0.4)] bg-[rgba(46,200,240,0.12)] px-4 py-3 text-sm font-semibold text-[var(--accent-link)] transition-all hover:border-[var(--accent-link)] hover:bg-[rgba(46,200,240,0.2)]">
-              Create Account
+            <Button variant="accent" block>
+              Create account
               <ArrowRight className="h-4 w-4" />
-            </button>
+            </Button>
           </SignUpButton>
-
           <SignInButton mode="modal">
-            <button className="flex w-full items-center justify-center gap-2 border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3 text-sm font-semibold text-[var(--text-secondary)] transition-all hover:border-[var(--border-bright)] hover:text-[var(--text-primary)]">
-              Sign In
-            </button>
+            <Button variant="secondary" block>
+              Sign in
+            </Button>
           </SignInButton>
         </div>
       </div>
 
-      <div className="hidden w-80 shrink-0 flex-col border-l border-[var(--border)] bg-[var(--bg-panel)] p-6 lg:flex">
-        <div className="panel-header -mx-6 -mt-6 mb-6 border-b border-[var(--border)] bg-[var(--bg-elevated)] px-6 py-3 text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">
-          Get Started
+      {/* ── right: the login bay ────────────────────────────────── */}
+      <aside className="hidden w-[340px] shrink-0 flex-col border-l border-[var(--border)] bg-[var(--bg-panel)] lg:flex">
+        <div className="panel-header flex items-center justify-between">
+          <span>Session · Auth</span>
+          <PortStrip className="scale-90 opacity-80" />
         </div>
 
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-            Ready to debug networks with AI?
+        <div className="flex flex-1 flex-col p-6">
+          <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">
+            Open a console session
           </h2>
-          <p className="mt-2 text-[12px] leading-relaxed text-[var(--text-secondary)]">
-            Create an account to access labs, run diagnostics, and let an agent help you
-            troubleshoot real network failures.
+          <p className="mt-2 font-[family-name:var(--font-sans)] text-[12.5px] leading-relaxed text-[var(--text-secondary)]">
+            An account gets you the labs, the diagnostic tools, and an agent that can drive them
+            alongside you.
           </p>
-        </div>
 
-        <div className="space-y-3">
-          <SignUpButton mode="modal">
-            <button className="flex w-full items-center justify-center gap-2 border border-[rgba(46,200,240,0.4)] bg-[rgba(46,200,240,0.12)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-link)] transition-all hover:border-[var(--accent-link)] hover:bg-[rgba(46,200,240,0.2)]">
-              Create Account
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </SignUpButton>
+          <div className="mt-6 space-y-2.5">
+            <SignUpButton mode="modal">
+              <Button variant="accent" block>
+                Create account
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </SignUpButton>
+            <SignInButton mode="modal">
+              <Button variant="secondary" block>
+                Sign in
+              </Button>
+            </SignInButton>
+            <p className="pt-1 text-center text-[10px] text-[var(--text-dim)]">
+              Creating an account accepts the Terms and Privacy Policy.
+            </p>
+          </div>
 
-          <SignInButton mode="modal">
-            <button className="flex w-full items-center justify-center gap-2 border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] transition-all hover:border-[var(--border-bright)] hover:text-[var(--text-primary)]">
-              Sign In
-            </button>
-          </SignInButton>
-
-          <p className="text-center text-[10px] text-[var(--text-dim)]">
-            By signing up, you agree to our Terms and Privacy Policy.
-          </p>
-        </div>
-
-        <div className="mt-auto pt-8">
-          <div className="border-t border-[var(--border)] pt-4">
-            <div className="mb-2 text-[9px] uppercase tracking-widest text-[var(--text-dim)]">
-              What you can do
+          <div className="mt-auto border-t border-[var(--border)] pt-4">
+            <div className="mb-2.5 text-[10px] uppercase tracking-[0.18em] text-[var(--text-dim)]">
+              In the session
             </div>
-            <ul className="space-y-2 text-[11px] text-[var(--text-secondary)]">
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 h-1 w-1 shrink-0 rounded-full bg-[var(--status-up)]" />
-                Inspect live network topology
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 h-1 w-1 shrink-0 rounded-full bg-[var(--status-up)]" />
-                Run ping, traceroute, ARP, and routing tools
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 h-1 w-1 shrink-0 rounded-full bg-[var(--status-up)]" />
-                Let NetOps Copilot diagnose issues via WebMCP
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 h-1 w-1 shrink-0 rounded-full bg-[var(--status-up)]" />
-                Approve fixes before they touch the network
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-0.5 h-1 w-1 shrink-0 rounded-full bg-[var(--status-up)]" />
-                Explore challenge labs like Missing Route, ARP Failure, and more
-              </li>
+            <ul className="space-y-1.5 text-[11.5px] text-[var(--text-secondary)]">
+              {[
+                'Inspect live topology and device state',
+                'Run ping, traceroute, arp and routing checks',
+                'Let the copilot diagnose faults over WebMCP',
+                'Approve every fix before it lands',
+                'Work challenge labs: Missing Route, ARP Failure, and more',
+              ].map((line) => (
+                <li key={line} className="flex gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 bg-[var(--status-up)]" />
+                  {line}
+                </li>
+              ))}
             </ul>
           </div>
         </div>
-      </div>
+      </aside>
     </div>
   )
 }

@@ -27,6 +27,8 @@ const STORAGE_KEY = 'netforge-device-lab'
 
 interface Persisted {
   progress: Record<DeviceKind, string[]>
+  /** Hardware Bench builds the player has completed, by bench id. */
+  benchDone: string[]
   explored: Record<DeviceKind, boolean>
   router: CliDevice
   switch: CliDevice
@@ -36,7 +38,7 @@ interface Persisted {
   switchConsole: ConsoleLine[]
 }
 
-function freshState(): Omit<Persisted, 'progress'> {
+function freshState(): Omit<Persisted, 'progress' | 'benchDone'> {
   return {
     explored: { router: false, switch: false, server: false, pc: false },
     router: createRouterDevice(),
@@ -70,6 +72,7 @@ function clone<T>(value: T): T {
 
 interface DeviceLabState {
   progress: Record<DeviceKind, string[]>
+  benchDone: string[]
   explored: Record<DeviceKind, boolean>
   router: CliDevice
   switch: CliDevice
@@ -82,6 +85,7 @@ interface DeviceLabState {
   pingEndpoint: (kind: 'server' | 'pc', destination: string) => PingResult
   toggleService: (kind: 'server', service: 'web' | 'dns' | 'dhcp') => void
   completeLesson: (kind: DeviceKind, lessonId: string) => void
+  completeBench: (benchId: string) => void
   isDone: (kind: DeviceKind, lessonId: string) => boolean
   markExplored: (kind: DeviceKind) => void
   resetDevice: (kind: DeviceKind) => void
@@ -91,6 +95,7 @@ interface DeviceLabState {
 function persist(state: DeviceLabState): void {
   const data: Persisted = {
     progress: state.progress,
+    benchDone: state.benchDone,
     explored: state.explored,
     router: state.router,
     switch: state.switch,
@@ -111,6 +116,7 @@ const fresh = freshState()
 
 export const useDeviceLabStore = create<DeviceLabState>((set, get) => ({
   progress: saved?.progress ?? { router: [], switch: [], server: [], pc: [] },
+  benchDone: saved?.benchDone ?? [],
   explored: saved?.explored ?? { router: false, switch: false, server: false, pc: false },
   router: saved?.router ?? fresh.router,
   switch: saved?.switch ?? fresh.switch,
@@ -205,6 +211,13 @@ export const useDeviceLabStore = create<DeviceLabState>((set, get) => ({
     persist(get())
   },
 
+  completeBench: (benchId) => {
+    set((state) => ({
+      benchDone: state.benchDone.includes(benchId) ? state.benchDone : [...state.benchDone, benchId],
+    }))
+    persist(get())
+  },
+
   isDone: (kind, lessonId) => get().progress[kind].includes(lessonId),
 
   markExplored: (kind) => {
@@ -222,7 +235,7 @@ export const useDeviceLabStore = create<DeviceLabState>((set, get) => ({
   },
 
   resetAll: () => {
-    set({ progress: { router: [], switch: [], server: [], pc: [] }, ...freshState() })
+    set({ progress: { router: [], switch: [], server: [], pc: [] }, benchDone: [], ...freshState() })
     persist(get())
   },
 }))

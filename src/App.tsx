@@ -95,6 +95,7 @@ function TopologyView() {
 function App() {
   const activeView = useUIStore((s) => s.activeView)
   const deviceLabCopilotRequested = useUIStore((s) => s.deviceLabCopilotRequested)
+  const deviceLabLessonOpen = useUIStore((s) => s.deviceLabLessonOpen)
   const glowEffects = useSettingsStore((s) => s.glowEffects)
   const { isSignedIn } = useAuth()
 
@@ -142,8 +143,9 @@ function App() {
       main = <DeviceLabView />
       bottom = undefined
       // Show AI Copilot only after the user explicitly presses "Ask Copilot"
-      // inside the lesson - the right sidebar is otherwise closed.
-      if (deviceLabCopilotRequested) {
+      // inside a lesson - the right sidebar is otherwise closed, and never
+      // shows on the lesson picker or hardware bench.
+      if (deviceLabCopilotRequested && deviceLabLessonOpen) {
         right = (
           <Suspense fallback={null}>
             <DeviceLabRightSidebar

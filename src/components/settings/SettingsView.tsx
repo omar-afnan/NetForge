@@ -7,6 +7,7 @@ import {
   Terminal,
   Trash2,
 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { starterLab } from '@/data/labs/starterLab'
 import { useNetworkStore } from '@/store/networkStore'
 import { useSettingsStore } from '@/store/settingsStore'
@@ -101,14 +102,15 @@ export function SettingsView() {
           <SlidersHorizontal className="h-3.5 w-3.5 text-[var(--accent-link)]" strokeWidth={1.75} />
           Settings
         </span>
-        <button
-          type="button"
+        <Button
+          variant="minimal"
+          size="sm"
           onClick={() => settings.resetSettings()}
-          className="btn-ghost flex items-center gap-1 text-[10px] normal-case tracking-normal"
+          className="normal-case tracking-normal"
         >
           <RotateCcw className="h-3 w-3" />
           Reset defaults
-        </button>
+        </Button>
       </div>
 
       <div className="flex-1 overflow-auto p-4">
@@ -197,30 +199,26 @@ export function SettingsView() {
               label="Reload starter lab"
               description="Reset the network to the default competition topology."
             >
-              <button
-                type="button"
-                onClick={() => loadLab(starterLab)}
-                className="btn-primary flex items-center gap-1.5 text-[11px]"
-              >
+              <Button variant="accent" size="sm" onClick={() => loadLab(starterLab)}>
                 <RefreshCw className="h-3 w-3" />
                 Reload
-              </button>
+              </Button>
             </SettingRow>
             <SettingRow
               label="Reset all lab progress"
               description="Clear every lab's completion record. Lab state, settings, and learn progress are kept."
             >
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => {
                   if (!window.confirm('Reset progress for all labs? This cannot be undone.')) return
                   useNetworkStore.getState().resetAllLabs()
                 }}
-                className="btn-primary flex items-center gap-1.5 text-[11px]"
               >
                 <Trash2 className="h-3 w-3" />
                 Reset labs
-              </button>
+              </Button>
             </SettingRow>
             <SettingRow
               label="Reset all progress"

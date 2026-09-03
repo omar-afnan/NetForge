@@ -1,0 +1,12 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="32" height="32" rx="6" fill="#0a0f0d"/>
+  <rect x="5" y="5" width="22" height="22" rx="4" fill="none" stroke="#202b26" stroke-width="1"/>
+  <!-- port-light strip: link LEDs, mostly up, one negotiating, one dead -->
+  <rect x="7"  y="18" width="3" height="7"  rx="1" fill="#3ddc84"/>
+  <rect x="11" y="14" width="3" height="11" rx="1" fill="#3ddc84"/>
+  <rect x="15" y="16" width="3" height="9"  rx="1" fill="#f4b740"/>
+  <rect x="19" y="12" width="3" height="13" rx="1" fill="#3ddc84"/>
+  <rect x="23" y="19" width="3" height="6"  rx="1" fill="#2f3f38"/>
+  <!-- interaction accent tick -->
+  <rect x="7" y="8" width="10" height="2" rx="1" fill="#7b6cff"/>
+</svg>

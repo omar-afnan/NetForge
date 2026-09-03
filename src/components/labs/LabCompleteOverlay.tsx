@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle2, PartyPopper, X } from 'lucide-react'
 import { useUIStore } from '@/store/uiStore'
+import { Button } from '@/components/ui/button'
 import { ALL_LABS } from '@/data/labs'
 import { labCompletionService, type LabCompletionEvent } from '@/features/labs/completion/completionEvents'
 
@@ -40,9 +41,9 @@ export function LabCompleteOverlay() {
               <div className="text-[12px] text-[var(--text-secondary)]">{lab.title}</div>
             </div>
           </div>
-          <button type="button" aria-label="Close" className="text-[var(--text-dim)] transition-colors hover:text-[var(--text-primary)]" onClick={close}>
+          <Button variant="icon" size="sm" aria-label="Close" onClick={close}>
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
         <ul className="mt-5 space-y-2 border-t border-[var(--border)] pt-4">
           {['Fault identified and diagnosed', 'Network configuration corrected', 'End-to-end connectivity restored'].map((line) => (
@@ -57,8 +58,8 @@ export function LabCompleteOverlay() {
           <div className="mt-1 font-data text-[12px] font-semibold text-[var(--accent-amber)]">{skill}</div>
         </div>
         <div className="mt-5 flex gap-2">
-          <button type="button" className="flex-1 border border-[var(--accent-link)] bg-[var(--accent-link)]/10 px-4 py-2 text-[12px] font-semibold text-[var(--accent-link)] transition-colors hover:bg-[var(--accent-link)]/20" onClick={() => { close(); setActiveView('labs') }}>Return to Lab Library</button>
-          <button type="button" className="border border-[var(--border)] px-4 py-2 text-[12px] text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]" onClick={close}>Keep exploring</button>
+          <Button variant="accent" size="sm" className="flex-1" onClick={() => { close(); setActiveView('labs') }}>Return to Lab Library</Button>
+          <Button variant="secondary" size="sm" onClick={close}>Keep exploring</Button>
         </div>
       </div>
     </div>

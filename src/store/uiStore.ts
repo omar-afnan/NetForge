@@ -42,9 +42,24 @@ export const useUIStore = create<UIState>((set) => ({
   pendingDeviceType: 'pc',
   wireKind: 'copper',
   topologyNotice: null,
-  setActiveView: (activeView) => set({ activeView }),
+  setActiveView: (activeView) =>
+    set(
+      activeView === 'devicelab'
+        ? { activeView }
+        : // Leaving Device Lab always tears down its right sidebar - the AI
+          // Copilot is scoped to an open lesson and must not follow the user
+          // into Learn, Topology, etc.
+          { activeView, deviceLabLessonOpen: false, deviceLabCopilotRequested: false },
+    ),
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
-  setDeviceLabLessonOpen: (deviceLabLessonOpen) => set({ deviceLabLessonOpen }),
+  setDeviceLabLessonOpen: (deviceLabLessonOpen) =>
+    set(
+      deviceLabLessonOpen
+        ? { deviceLabLessonOpen: true }
+        : // Closing the lesson (back to the picker) also closes the Copilot -
+          // it should never linger on the lesson list.
+          { deviceLabLessonOpen: false, deviceLabCopilotRequested: false },
+    ),
   setDeviceLabCopilotRequested: (deviceLabCopilotRequested) =>
     set({ deviceLabCopilotRequested }),
   openDeviceLabLesson: (kind, lessonId) =>

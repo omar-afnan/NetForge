@@ -11,10 +11,10 @@ const CANVAS_W = 1240
 const CANVAS_H = 560
 
 const typeColors: Record<string, string> = {
-  pc: '#2563eb',
-  switch: '#8b9cb3',
-  router: '#f0b429',
-  server: '#16a34a',
+  pc: '#7b6cff',
+  switch: '#8ba79b',
+  router: '#f4b740',
+  server: '#3ddc84',
 }
 
 const typeLabels: Record<string, string> = {
@@ -443,7 +443,7 @@ export function TopologyCanvas() {
             <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000" floodOpacity="0.5" />
           </filter>
           <filter id="selected-glow" x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#2563eb" floodOpacity="0.35" />
+            <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#7b6cff" floodOpacity="0.45" />
           </filter>
         </defs>
 
@@ -585,19 +585,19 @@ export function TopologyCanvas() {
               <rect
                 width={NODE_W}
                 height={NODE_H}
-                fill={selected ? '#f8fafc' : '#ffffff'}
-                stroke={selected ? '#2563eb' : failed ? '#dc2626' : '#cbd5e1'}
+                fill={selected ? '#141c18' : '#0f1512'}
+                stroke={selected ? '#7b6cff' : failed ? '#ff5c57' : '#2f3f38'}
                 strokeWidth={selected ? 1.5 : 1}
               />
               <rect x={0} y={0} width={NODE_W} height={3} fill={color} />
               <image href={typeIcons[device.type]} x={70} y={4} width={14} height={14} preserveAspectRatio="xMidYMid meet" />
-              <text x={7} y={17} fill="#0f172a" fontSize="10" fontFamily="Consolas, monospace" fontWeight="600">
+              <text x={7} y={17} fill="#dae7e0" fontSize="10" fontFamily="Consolas, monospace" fontWeight="600">
                 {device.hostname}
               </text>
-              <text x={7} y={30} fill="#475569" fontSize="8" fontFamily="Consolas, monospace">
+              <text x={7} y={30} fill="#8ba79b" fontSize="8" fontFamily="Consolas, monospace">
                 {typeLabels[device.type]}
               </text>
-              <text x={7} y={43} fill="#64748b" fontSize="8" fontFamily="Consolas, monospace">
+              <text x={7} y={43} fill="#5c7268" fontSize="8" fontFamily="Consolas, monospace">
                 {primaryIp ?? 'n/a'}
               </text>
               {wirePicked && (
@@ -618,7 +618,7 @@ export function TopologyCanvas() {
                   width={NODE_W + 12}
                   height={NODE_H + 12}
                   fill="none"
-                  stroke="#f0b429"
+                  stroke="#7b6cff"
                   strokeWidth={2}
                   strokeDasharray="6 4"
                   className="ai-highlight-ring"

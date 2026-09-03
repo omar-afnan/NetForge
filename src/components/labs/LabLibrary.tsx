@@ -1,4 +1,5 @@
 import { FlaskConical, Play, CheckCircle2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { ALL_LABS } from '@/data/labs'
 import { useNetworkStore } from '@/store/networkStore'
 import { useUIStore } from '@/store/uiStore'
@@ -74,16 +75,11 @@ export function LabLibrary() {
                   {lab.description}
                 </p>
 
-                <button
-                  type="button"
+                <Button
+                  variant={active ? 'minimal' : progress?.completed ? 'secondary' : 'accent'}
+                  size="sm"
                   disabled={active}
-                  className={`mt-3 flex items-center justify-center gap-1.5 border px-3 py-1.5 font-data text-[11px] transition-colors ${
-                    active
-                      ? 'cursor-default border-[var(--border)] text-[var(--text-dim)]'
-                      : progress?.completed
-                        ? 'border-[var(--status-up)] text-[var(--status-up)] hover:bg-[rgba(22,163,74,0.08)]'
-                        : 'border-[var(--accent-link)] text-[var(--accent-link)] hover:bg-[rgba(46,200,240,0.1)]'
-                  }`}
+                  className="mt-3"
                   onClick={() => {
                     loadLab(lab)
                     setActiveView('topology')
@@ -91,7 +87,7 @@ export function LabLibrary() {
                 >
                   <Play className="h-3 w-3" />
                   {active ? 'Currently loaded' : progress?.completed ? 'Open Lab' : 'Load Lab'}
-                </button>
+                </Button>
               </div>
             )
           })}

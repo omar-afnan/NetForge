@@ -1,11 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, Cpu, Lightbulb, Monitor, Network, Server } from 'lucide-react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { Cable, ChevronLeft, Cpu, Lightbulb, Monitor, Network, Server } from 'lucide-react'
 import { useDeviceLabStore } from '@/store/deviceLabStore'
 import { useUIStore } from '@/store/uiStore'
 import type { DeviceKind } from '@/store/deviceLabStore'
 import { COURSES, allLessons, findLesson } from '@/devicelab/lessons'
 import { explorerHotspots, explorerFirstLesson } from '@/devicelab/explorerData'
 import { DeviceExplorer } from '@/components/devicelab/DeviceExplorer'
+// The bench pulls in three.js - keep it out of the main bundle.
+const HardwareBench = lazy(() =>
+  import('@/components/devicelab/HardwareBench').then((m) => ({ default: m.HardwareBench })),
+)
+import { BENCHES } from '@/devicelab/hardwareBench'
 import type { LessonCheckCtx } from '@/devicelab/lessons'
 import type { CliDevice, EndpointDevice } from '@/devicelab/cli'
 import { celebrateLab } from '@/lib/celebrate'
@@ -26,8 +31,9 @@ function ProgressBar({ done, total }: { done: number; total: number }) {
   )
 }
 
-function HomePage({ onOpen }: { onOpen: (kind: DeviceKind) => void }) {
+function HomePage({ onOpen, onOpenBench }: { onOpen: (kind: DeviceKind) => void; onOpenBench: (benchId: string) => void }) {
   const progress = useDeviceLabStore((s) => s.progress)
+  const benchDone = useDeviceLabStore((s) => s.benchDone)
   return (
     <div className="view-enter flex h-full flex-col overflow-auto">
       <div className="panel-header">Device Lab</div>
@@ -61,6 +67,41 @@ function HomePage({ onOpen }: { onOpen: (kind: DeviceKind) => void }) {
                 <div className="mt-2.5">
                   <ProgressBar done={done} total={lessons.length} />
                 </div>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="mt-6 flex items-center gap-2">
+          <Cable className="h-4 w-4 text-[var(--accent-link)]" strokeWidth={1.75} />
+          <h2 className="text-[13px] font-bold text-[var(--text-primary)]">Hardware Bench</h2>
+          <span className="text-[10.5px] text-[var(--text-dim)]">Plug it in - connect power and cables, step by step.</span>
+        </div>
+        <div className="mt-2 grid gap-2.5 sm:grid-cols-2">
+          {BENCHES.map((bench) => {
+            const complete = benchDone.includes(bench.id)
+            return (
+              <button
+                key={bench.id}
+                type="button"
+                onClick={() => onOpenBench(bench.id)}
+                className="lesson-card hover-lift group rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] p-3 text-left transition-all hover:border-[var(--accent-link)] hover:shadow-sm"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-bright)] bg-[var(--bg-inset)]">
+                    <Cable className="h-4 w-4 text-[var(--accent-link)]" strokeWidth={1.75} />
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-bold text-[var(--text-primary)]">{bench.title}</div>
+                    <div className="text-[10.5px] text-[var(--text-dim)]">{bench.subtitle}</div>
+                  </div>
+                  {complete && (
+                    <span className="ml-auto rounded-full border border-[var(--status-up)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--status-up)]">
+                      Done
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-[11.5px] leading-snug text-[var(--text-secondary)]">{bench.blurb}</p>
               </button>
             )
           })}
@@ -660,6 +701,7 @@ export function DeviceLabView() {
   const [openKind, setOpenKind] = useState<DeviceKind | null>(null)
   const [openLessonId, setOpenLessonId] = useState<string | null>(null)
   const [exploreKind, setExploreKind] = useState<DeviceKind | null>(null)
+  const [benchId, setBenchId] = useState<string | null>(null)
   const pending = useUIStore((s) => s.pendingDeviceLabLesson)
   const clearPending = useUIStore((s) => s.clearPendingDeviceLabLesson)
 
@@ -688,6 +730,13 @@ export function DeviceLabView() {
     return () => setDeviceLabLessonOpen(false)
   }, [openKind, openLessonId, setDeviceLabLessonOpen])
 
+  if (benchId) {
+    return (
+      <Suspense fallback={<div className="flex h-full items-center justify-center text-[12px] text-[var(--text-dim)]">Loading 3D bench…</div>}>
+        <HardwareBench benchId={benchId} onBack={() => setBenchId(null)} />
+      </Suspense>
+    )
+  }
   if (exploreKind) {
     return (
       <DeviceExplorer
@@ -709,5 +758,10 @@ export function DeviceLabView() {
   if (openKind) {
     return <LessonListPage kind={openKind} onBack={() => setOpenKind(null)} onOpen={(id) => setOpenLessonId(id)} onExplore={() => setExploreKind(openKind)} />
   }
-  return <HomePage onOpen={(kind) => { setOpenKind(kind); setOpenLessonId(null) }} />
+  return (
+    <HomePage
+      onOpen={(kind) => { setOpenKind(kind); setOpenLessonId(null) }}
+      onOpenBench={(id) => setBenchId(id)}
+    />
+  )
 }

@@ -9,6 +9,7 @@ import {
   Sparkles,
   Wrench,
 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useNetworkStore } from '@/store/networkStore'
 import { useCopilotStore } from '@/store/copilotStore'
 import { useUIStore } from '@/store/uiStore'
@@ -725,18 +726,15 @@ export function IssueTracker() {
               </label>
             ))}
           </div>
-          <button
-            type="button"
+          <Button
+            variant="accent"
+            size="sm"
             disabled={!hypothesis}
             onClick={submitHypothesis}
-            className={`mt-3 border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-              hypothesis
-                ? 'border-[var(--accent-link)] text-[var(--accent-link)] hover:bg-[rgba(46,200,240,0.1)]'
-                : 'cursor-not-allowed border-[var(--border)] text-[var(--text-dim)]'
-            }`}
+            className="mt-3"
           >
             Submit Hypothesis
-          </button>
+          </Button>
           {hypothesisFeedback && (
             <div className="mt-2 border-l-2 border-[var(--accent-amber)] bg-[rgba(240,180,41,0.06)] px-3 py-2 text-[12px] leading-relaxed whitespace-pre-wrap text-[var(--text-secondary)]">
               {hypothesisFeedback}
@@ -800,21 +798,13 @@ export function IssueTracker() {
             {suggestedFix.detail && (
               <div className="mt-1 text-[11px] text-[var(--text-secondary)]">{suggestedFix.detail}</div>
             )}
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                className="border border-[var(--accent-link)] px-3 py-1.5 font-data text-[11px] text-[var(--accent-link)] transition-colors hover:bg-[rgba(46,200,240,0.1)]"
-                onClick={applyFix}
-              >
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button variant="accent" size="sm" onClick={applyFix}>
                 Apply Fix
-              </button>
-              <button
-                type="button"
-                className="border border-[var(--border-bright)] px-3 py-1.5 font-data text-[11px] text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
-                onClick={() => setActiveView('topology')}
-              >
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setActiveView('topology')}>
                 I'll Fix It Myself (topology / terminal)
-              </button>
+              </Button>
             </div>
           </Section>
         )}
