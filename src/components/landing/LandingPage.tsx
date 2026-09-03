@@ -1,6 +1,7 @@
-import { ArrowRight, Globe, Shield, Zap } from 'lucide-react'
+import { ArrowRight, GraduationCap, Network, Wrench } from 'lucide-react'
 import { SignInButton, SignUpButton } from '@clerk/react'
 import { Button } from '@/components/ui/button'
+import { HeroSubnetDemo } from '@/components/landing/HeroSubnetDemo'
 
 /**
  * Signature element: the port-light strip. It's the row of link LEDs above a
@@ -39,22 +40,22 @@ function PortStrip({ className = '' }: { className?: string }) {
 
 const CAPABILITIES = [
   {
-    icon: Globe,
-    tag: 'topology',
-    title: 'Live topology',
-    desc: 'Device state, links and routing rendered from the running simulator — not a static diagram.',
+    icon: GraduationCap,
+    tag: 'lessons',
+    title: 'Interactive lessons',
+    desc: 'Move the bits yourself. Subnetting, addressing and routing taught as things you manipulate, not paragraphs you read.',
   },
   {
-    icon: Zap,
-    tag: 'diagnostics',
-    title: 'Real instruments',
-    desc: 'ping · traceroute · arp · show ip route — each computed against actual simulator state.',
+    icon: Network,
+    tag: 'labs',
+    title: 'Realistic network labs',
+    desc: 'Apply each concept on a live simulated network — real ping, traceroute, arp and routing, computed from actual state.',
   },
   {
-    icon: Shield,
-    tag: 'control',
-    title: 'Human in the loop',
-    desc: 'The agent proposes a fix and shows its work. Nothing touches the network until you approve.',
+    icon: Wrench,
+    tag: 'troubleshooting',
+    title: 'Guided troubleshooting',
+    desc: 'Break a network, read the symptom, chase it down. An AI copilot explains the fault instead of just handing you the answer.',
   },
 ]
 
@@ -77,16 +78,18 @@ export function LandingPage() {
         </header>
 
         <h1 className="mt-10 max-w-2xl text-[2.1rem] font-semibold leading-[1.15] tracking-tight text-[var(--text-primary)] lg:text-[2.75rem]">
-          A network that agents
+          Learn networking
           <br />
-          can <span className="text-[var(--accent-link)]">actually</span> debug.
+          by <span className="text-[var(--accent-link)]">building</span> it.
         </h1>
 
         <p className="mt-6 max-w-xl font-[family-name:var(--font-sans)] text-[15px] leading-relaxed text-[var(--text-secondary)]">
-          NetForge is a troubleshooting lab where a person and an AI agent work the same broken
-          network — inspecting, diagnosing, repairing and verifying simulated faults through real,
-          structured tool calls.
+          Interactive networking lessons and realistic virtual labs that show you how networks
+          actually work — IP addressing, subnetting, routing, switching and troubleshooting, learned
+          by doing rather than memorising.
         </p>
+
+        <HeroSubnetDemo />
 
         {/* instrument manifest — monospace, reads as a device banner */}
         <dl className="mt-10 grid max-w-2xl gap-x-8 gap-y-4 sm:grid-cols-3">
@@ -143,8 +146,8 @@ export function LandingPage() {
             Open a console session
           </h2>
           <p className="mt-2 font-[family-name:var(--font-sans)] text-[12.5px] leading-relaxed text-[var(--text-secondary)]">
-            An account gets you the labs, the diagnostic tools, and an agent that can drive them
-            alongside you.
+            An account gets you the interactive lessons, the virtual labs, the diagnostic tools, and
+            an AI copilot that works the same network you do.
           </p>
 
           <div className="mt-6 space-y-2.5">
@@ -170,10 +173,10 @@ export function LandingPage() {
             </div>
             <ul className="space-y-1.5 text-[11.5px] text-[var(--text-secondary)]">
               {[
+                'Interactive lesson: Understanding IPv4 & CIDR',
                 'Inspect live topology and device state',
                 'Run ping, traceroute, arp and routing checks',
                 'Let the copilot diagnose faults over WebMCP',
-                'Approve every fix before it lands',
                 'Work challenge labs: Missing Route, ARP Failure, and more',
               ].map((line) => (
                 <li key={line} className="flex gap-2">

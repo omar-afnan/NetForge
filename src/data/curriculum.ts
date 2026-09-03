@@ -34,6 +34,11 @@ export interface CurriculumModule {
   relatedLabIds?: string[]
   /** Placeholder modules planned for a future release. */
   comingSoon?: boolean
+  /**
+   * Id of an interactive concept lab (see src/data/lessons/) offered above the
+   * text lessons for this module. Currently only 'ipv4-cidr'.
+   */
+  interactiveLessonId?: string
   lessons: Lesson[]
 }
 
@@ -257,6 +262,7 @@ export const CURRICULUM: CurriculumModule[] = [
     title: 'Subnetting',
     blurb: 'Splitting one network into many: prefix lengths, borrowing bits, and calculating ranges fast.',
     relatedLabIds: ['subnetting-lab'],
+    interactiveLessonId: 'ipv4-cidr',
     lessons: [
       {
         id: 'prefix-lengths',

@@ -1,8 +1,10 @@
 # NetForge
 
-**A network that agents can actually debug.**
+**Learn networking by building it.**
 
-NetForge is a hands-on networking lab you run in the browser. Instead of learning routing, ARP, gateways and subnets from diagrams, you work on a live simulated network — break it, investigate it, and fix it. It ships with an AI copilot that can see the same network you do, and a set of WebMCP tools so an outside AI agent can drive the simulator directly.
+NetForge is an interactive networking learning platform with a realistic virtual network lab. You start with guided, interactive lessons — move the network/host boundary yourself, split a `/24` into `/26`s, watch a mask fall out of a prefix — then apply what you learned on a live simulated network you can break, investigate and fix. It ships with an AI copilot that can see the same network you do, and a set of WebMCP tools so an outside AI agent can drive the simulator directly.
+
+The simulator is the mechanism; the education is the product.
 
 ---
 
@@ -123,7 +125,7 @@ It always works off the real topology and device config, so any change you make 
 | View | What it's for |
 |---|---|
 | **Dashboard** | Stats + device inventory |
-| **Learn** | Short networking explainers and references |
+| **Learn** | CCNA-level curriculum. Includes the interactive **Understanding IPv4 & CIDR** concept lab — an octet bit builder, a draggable CIDR explorer, prefix→mask derivation, network/broadcast/host-range breakdown, a subnet splitter, and a subnet-design practice challenge — plus per-concept mastery tracking |
 | **Device Lab** | A separate guided CLI sandbox for practicing device configuration |
 | **Lab Library** | Browse and load troubleshooting labs, see completion badges |
 | **Topology** | The interactive network map — drag, wire, add and inspect devices |
@@ -207,6 +209,7 @@ State is local to the browser (`localStorage`), so your work survives a refresh:
 | `netforge-network` | Current topology and device config |
 | `netforge-lab-progress` | Which labs you've completed |
 | `netforge-learn-progress` | Learn lessons marked done |
+| `netforge-concept-mastery` | Per-concept mastery scores from the interactive lessons |
 | `netforge-device-lab` | Device Lab sandbox state |
 | `netforge-settings` | UI preferences |
 

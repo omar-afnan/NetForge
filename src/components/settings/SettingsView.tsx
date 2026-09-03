@@ -13,6 +13,7 @@ import { useNetworkStore } from '@/store/networkStore'
 import { useSettingsStore } from '@/store/settingsStore'
 import { useDeviceLabStore } from '@/store/deviceLabStore'
 import { useLearnProgress } from '@/store/progressStore'
+import { useConceptMastery } from '@/store/masteryStore'
 
 function SettingSection({
   title,
@@ -241,6 +242,7 @@ export function SettingsView() {
                     localStorage.removeItem('netforge-lab-progress')
                     localStorage.removeItem('netforge-device-lab')
                     localStorage.removeItem('netforge-learn-progress')
+                    localStorage.removeItem('netforge-concept-mastery')
                     localStorage.removeItem('netforge-settings')
                   } catch {
                     // ignore quota / private-mode errors
@@ -249,6 +251,7 @@ export function SettingsView() {
                   // briefly backed by stale objects before localStorage is read.
                   useNetworkStore.getState().resetAllLabs()
                   useLearnProgress.getState().resetProgress()
+                  useConceptMastery.getState().reset()
                   useDeviceLabStore.getState().resetAll()
                   useSettingsStore.getState().resetSettings()
                   window.location.reload()

@@ -1,11 +1,20 @@
 import { useMemo, useState } from 'react'
-import { BookOpen, CheckCircle2, Circle, FlaskConical, Lock, Monitor } from 'lucide-react'
+import { BookOpen, CheckCircle2, Circle, FlaskConical, GraduationCap, Lock, Monitor } from 'lucide-react'
 import { EXPLAINERS } from '@/components/learn/Explainers'
 import { CURRICULUM, type CurriculumModule, type Lesson } from '@/data/curriculum'
 import { useLearnProgress } from '@/store/progressStore'
 import { useNetworkStore } from '@/store/networkStore'
 import { useUIStore } from '@/store/uiStore'
 import { ALL_LABS } from '@/data/labs'
+import { IPV4_CIDR_LESSON, type InteractiveLesson } from '@/data/lessons/ipv4-cidr'
+import { LabIntro } from '@/components/learn/LabIntro'
+import { InteractiveLessonRunner } from '@/components/learn/InteractiveLessonRunner'
+import { ConceptMasteryPanel } from '@/components/learn/ConceptMasteryPanel'
+
+/** Interactive concept labs, keyed by CurriculumModule.interactiveLessonId. */
+const INTERACTIVE_LESSONS: Record<string, InteractiveLesson> = {
+  'ipv4-cidr': IPV4_CIDR_LESSON,
+}
 
 /** Maps each Learn module to the Device Lab lesson that lets the student practice the concept hands-on. */
 const MODULE_DEVICE_LAB: Record<string, { kind: 'router' | 'switch' | 'server' | 'pc'; lessonId: string; label: string }> = {
@@ -185,9 +194,39 @@ export function LearnView() {
   const lessons = useLearnProgress((s) => s.lessons)
   const [openModuleId, setOpenModuleId] = useState<string | null>(null)
   const [openLessonId, setOpenLessonId] = useState<string | null>(null)
+  /** Active interactive concept lab, if any. */
+  const [interactive, setInteractive] = useState<
+    { moduleId: string; lessonId: string; phase: 'intro' | 'learn' | 'practice' } | null
+  >(null)
 
   const openModule = CURRICULUM.find((m) => m.id === openModuleId)
   const openLesson = openModule?.lessons.find((l) => l.id === openLessonId)
+
+  if (interactive) {
+    const lesson = INTERACTIVE_LESSONS[interactive.lessonId]
+    if (lesson) {
+      const done = Boolean(lessons[`${interactive.moduleId}/${lesson.id}`])
+      if (interactive.phase === 'intro') {
+        return (
+          <LabIntro
+            lesson={lesson}
+            done={done}
+            onLearn={() => setInteractive({ ...interactive, phase: 'learn' })}
+            onPractice={() => setInteractive({ ...interactive, phase: 'practice' })}
+            onBack={() => setInteractive(null)}
+          />
+        )
+      }
+      return (
+        <InteractiveLessonRunner
+          moduleId={interactive.moduleId}
+          lesson={lesson}
+          startAtPractice={interactive.phase === 'practice'}
+          onExit={() => setInteractive(null)}
+        />
+      )
+    }
+  }
 
   const totalDone = CURRICULUM.reduce(
     (sum, m) => sum + m.lessons.filter((l) => lessons[`${m.id}/${l.id}`]).length,
@@ -225,6 +264,9 @@ export function LearnView() {
       </div>
 
       <div className="flex-1 overflow-auto p-3">
+        <div className="mx-auto max-w-3xl">
+          <ConceptMasteryPanel />
+        </div>
         <div className="mx-auto grid max-w-3xl gap-3">
           {CURRICULUM.map((module) => {
             const doneCount = module.lessons.filter((l) => lessons[`${module.id}/${l.id}`]).length
@@ -271,6 +313,32 @@ export function LearnView() {
                     )}
                   </div>
                 </button>
+
+                {expanded && !module.comingSoon && module.interactiveLessonId &&
+                  INTERACTIVE_LESSONS[module.interactiveLessonId] && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setInteractive({
+                          moduleId: module.id,
+                          lessonId: module.interactiveLessonId!,
+                          phase: 'intro',
+                        })
+                      }
+                      className="flex w-full items-center gap-2.5 border-t border-[var(--border)] bg-[var(--accent-link-dim)] px-3 py-2.5 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--accent-link)_22%,transparent)]"
+                    >
+                      <GraduationCap className="h-4 w-4 shrink-0 text-[var(--accent-link)]" strokeWidth={1.75} />
+                      <span className="flex-1">
+                        <span className="block text-[12px] font-bold text-[var(--text-primary)]">
+                          Start Interactive Lesson
+                        </span>
+                        <span className="block text-[10px] text-[var(--text-secondary)]">
+                          {INTERACTIVE_LESSONS[module.interactiveLessonId].title} · guided visuals + practice
+                        </span>
+                      </span>
+                      <span className="badge badge-cyan text-[9px]">new</span>
+                    </button>
+                  )}
 
                 {expanded && !module.comingSoon && (
                   <ul className="border-t border-[var(--border)]">
