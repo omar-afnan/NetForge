@@ -15,6 +15,11 @@ interface Cbl {
   cable?: 'power' | 'data'
 }
 
+/** Order-independent equality for a cable's two endpoints. */
+function sameCable(x: { from: string; to: string }, y: { from: string; to: string }): boolean {
+  return (x.from === y.from && x.to === y.to) || (x.from === y.to && x.to === y.from)
+}
+
 type PortState = 'idle' | 'connected' | 'armed' | 'live'
 
 const DEVICE_COLOR: Record<string, string> = {
@@ -24,6 +29,10 @@ const DEVICE_COLOR: Record<string, string> = {
   switch: '#4d7aa8',
   laptop: '#6a7488',
   desktop: '#5b6478',
+  pc: '#5b6478',
+  accesspoint: '#4f7f9e',
+  printer: '#6b7280',
+  phone: '#67707f',
 }
 
 /** Stand a plug/label a touch off the box face. */
@@ -43,7 +52,11 @@ function Device({ node, powered, booting }: { node: BenchNode; powered: boolean;
   })
 
   const [w, h, d] = node.size
-  const hasLed = node.icon === 'router' || node.icon === 'switch' || node.icon === 'modem'
+  const hasLed =
+    node.icon === 'router' ||
+    node.icon === 'switch' ||
+    node.icon === 'modem' ||
+    node.icon === 'accesspoint'
 
   return (
     <group position={[node.pos[0], 0, node.pos[1]]}>
@@ -213,7 +226,22 @@ function Port({
 
 /* ── one cable ────────────────────────────────────────────────────────── */
 
-function CableTube({ a, b, kind }: { a: [number, number, number]; b: [number, number, number]; kind?: 'power' | 'data' }): ReactElement {
+function CableTube({
+  a,
+  b,
+  kind,
+  faulty,
+  onClick,
+}: {
+  a: [number, number, number]
+  b: [number, number, number]
+  kind?: 'power' | 'data'
+  /** Troubleshooting: this cable is the one the current step wants unplugged. */
+  faulty?: boolean
+  onClick?: () => void
+}): ReactElement {
+  const [hover, setHover] = useState(false)
+  const mat = useRef<THREE.MeshStandardMaterial>(null)
   const curve = useMemo(() => {
     const va = new THREE.Vector3(...a)
     const vb = new THREE.Vector3(...b)
@@ -223,10 +251,30 @@ function CableTube({ a, b, kind }: { a: [number, number, number]; b: [number, nu
     return new THREE.QuadraticBezierCurve3(va, mid, vb)
   }, [a, b])
 
+  useFrame(({ clock }) => {
+    if (!mat.current) return
+    const pulse = faulty ? 0.5 + Math.sin(clock.elapsedTime * 5) * 0.4 : 0
+    mat.current.emissiveIntensity += (pulse - mat.current.emissiveIntensity) * 0.2
+  })
+
+  const baseColor = kind === 'power' ? '#e0a33e' : '#6f7dff'
   return (
-    <mesh castShadow>
-      <tubeGeometry args={[curve, 44, kind === 'power' ? 0.05 : 0.043, 10, false]} />
-      <meshStandardMaterial color={kind === 'power' ? '#e0a33e' : '#6f7dff'} roughness={0.5} metalness={0.1} />
+    <mesh
+      castShadow
+      onPointerOver={faulty ? (e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer' } : undefined}
+      onPointerOut={faulty ? () => { setHover(false); document.body.style.cursor = '' } : undefined}
+      onClick={faulty && onClick ? (e) => { e.stopPropagation(); onClick() } : undefined}
+    >
+      <tubeGeometry args={[curve, 44, kind === 'power' ? 0.05 : (faulty ? 0.055 : 0.043), 10, false]} />
+      <meshStandardMaterial
+        ref={mat}
+        color={faulty ? (hover ? '#ff8a8a' : '#ff5d5d') : baseColor}
+        emissive={faulty ? '#ff5d5d' : '#000000'}
+        emissiveIntensity={0}
+        roughness={0.5}
+        metalness={0.1}
+        toneMapped={!faulty}
+      />
     </mesh>
   )
 }
@@ -242,12 +290,15 @@ interface SceneProps {
   armed: string | null
   /** Ports the current step is asking the player to touch - the only ones we label. */
   hintIds: Set<string>
+  /** Troubleshooting: the mis-cabled link the current step wants unplugged. */
+  faultyCable: Cbl | null
   portState: (id: string) => PortState
   onPortClick: (id: string) => void
   onPower: (node: BenchNode) => void
+  onRemoveCable: (c: Cbl) => void
 }
 
-function BenchScene({ bench, cables, connectedIds, poweredIds, booting, hintIds, portState, onPortClick, onPower }: SceneProps): ReactElement {
+function BenchScene({ bench, cables, connectedIds, poweredIds, booting, hintIds, faultyCable, portState, onPortClick, onPower, onRemoveCable }: SceneProps): ReactElement {
   const portIndex = useMemo(() => {
     const m: Record<string, { node: BenchNode; port: BenchPort }> = {}
     for (const n of bench.nodes) for (const p of n.ports) m[p.id] = { node: n, port: p }
@@ -306,7 +357,14 @@ function BenchScene({ bench, cables, connectedIds, poweredIds, booting, hintIds,
       )}
 
       {cables.map((c, i) => (
-        <CableTube key={i} a={endpoint(c.from)} b={endpoint(c.to)} kind={c.cable} />
+        <CableTube
+          key={i}
+          a={endpoint(c.from)}
+          b={endpoint(c.to)}
+          kind={c.cable}
+          faulty={!!faultyCable && sameCable(faultyCable, c)}
+          onClick={() => onRemoveCable(c)}
+        />
       ))}
 
       {bench.nodes
@@ -373,8 +431,8 @@ export function HardwareBench({ benchId, onBack }: { benchId: string; onBack: ()
   const bench = findBench(benchId)
   const completeBench = useDeviceLabStore((s) => s.completeBench)
 
-  const [cables, setCables] = useState<Cbl[]>([])
-  const [powered, setPowered] = useState<Set<string>>(new Set())
+  const [cables, setCables] = useState<Cbl[]>(() => bench?.initialCables?.map((c) => ({ ...c })) ?? [])
+  const [powered, setPowered] = useState<Set<string>>(() => new Set(bench?.initialPowered ?? []))
   const [booting, setBooting] = useState<string | null>(null)
   const [armed, setArmed] = useState<string | null>(null)
   const [stepIndex, setStepIndex] = useState(0)
@@ -394,6 +452,10 @@ export function HardwareBench({ benchId, onBack }: { benchId: string; onBack: ()
   const hintIds = new Set<string>(
     !done && step?.type === 'connect' && step.from && step.to ? [step.from, step.to] : [],
   )
+  const faultyCable: Cbl | null =
+    !done && step?.type === 'fix-remove' && step.from && step.to
+      ? { from: step.from, to: step.to }
+      : null
   const nodePowered = (nodeId: string) => {
     const n = bench.nodes.find((x) => x.id === nodeId)
     return !n?.needsPower || powered.has(nodeId)
@@ -411,8 +473,8 @@ export function HardwareBench({ benchId, onBack }: { benchId: string; onBack: ()
   }
 
   const reset = () => {
-    setCables([])
-    setPowered(new Set())
+    setCables(bench.initialCables?.map((c) => ({ ...c })) ?? [])
+    setPowered(new Set(bench.initialPowered ?? []))
     setBooting(null)
     setArmed(null)
     setStepIndex(0)
@@ -444,6 +506,16 @@ export function HardwareBench({ benchId, onBack }: { benchId: string; onBack: ()
       return
     }
     setFeedback(`That is not the cable this step needs. You tried ${portLabels[a] ?? a} → ${portLabels[b] ?? b}.`)
+  }
+
+  const removeCable = (c: Cbl) => {
+    if (done || booting) return
+    if (step?.type === 'fix-remove' && step.from && step.to && sameCable({ from: step.from, to: step.to }, c)) {
+      setCables((prev) => prev.filter((x) => !sameCable(x, c)))
+      advance()
+    } else {
+      setFeedback('That cable is not the fault this step is describing. Keep inspecting.')
+    }
   }
 
   const clickPort = (portId: string) => {
@@ -509,7 +581,11 @@ export function HardwareBench({ benchId, onBack }: { benchId: string; onBack: ()
           <div className="bench-stage-top">
             <Cable className="h-4 w-4 text-[var(--accent-link)]" />
             <span className="text-[12px] font-semibold text-[var(--text-primary)]">
-              {armed ? 'Now click the other end of the cable' : 'Click a port, then click where the cable plugs in'}
+              {armed
+                ? 'Now click the other end of the cable'
+                : step?.type === 'fix-remove'
+                  ? 'Click the glowing red cable to unplug it'
+                  : 'Click a port, then click where the cable plugs in'}
             </span>
             <span className="ml-auto text-[10.5px] text-[var(--text-dim)]">drag to orbit · scroll to zoom</span>
           </div>
@@ -525,9 +601,11 @@ export function HardwareBench({ benchId, onBack }: { benchId: string; onBack: ()
                   booting={booting}
                   armed={armed}
                   hintIds={hintIds}
+                  faultyCable={faultyCable}
                   portState={portState}
                   onPortClick={clickPort}
                   onPower={pressPower}
+                  onRemoveCable={removeCable}
                 />
               </Suspense>
             </Canvas>
@@ -560,6 +638,16 @@ export function HardwareBench({ benchId, onBack }: { benchId: string; onBack: ()
             </div>
           ) : (
             <>
+              {bench.symptom && (
+                <div className="mb-3 border-l-2 border-[var(--status-down)] bg-[color-mix(in_srgb,var(--status-down)_8%,transparent)] px-3 py-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-widest text-[var(--status-down)]">
+                    Reported fault
+                  </div>
+                  <p className="mt-0.5 text-[11.5px] leading-snug text-[var(--text-secondary)]">
+                    {bench.symptom}
+                  </p>
+                </div>
+              )}
               <div className="bench-step-tag">
                 Step {stepIndex + 1} of {bench.steps.length}
               </div>

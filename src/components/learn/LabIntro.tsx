@@ -1,6 +1,6 @@
 import { Check, Clock, FlaskConical, GraduationCap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import type { InteractiveLesson } from '@/data/lessons/ipv4-cidr'
+import type { InteractiveLesson } from '@/data/lessons/types'
 
 /**
  * The lab entry screen. Instead of dropping the learner onto a blank canvas,
@@ -66,10 +66,12 @@ export function LabIntro({
               <GraduationCap className="h-4 w-4" strokeWidth={1.75} />
               Learn the Concept
             </Button>
-            <Button variant="secondary" onClick={onPractice}>
-              <FlaskConical className="h-4 w-4" strokeWidth={1.75} />
-              Skip to Practice
-            </Button>
+            {lesson.steps.some((s) => s.kind === 'practice') && (
+              <Button variant="secondary" onClick={onPractice}>
+                <FlaskConical className="h-4 w-4" strokeWidth={1.75} />
+                Skip to Practice
+              </Button>
+            )}
           </div>
         </div>
       </div>

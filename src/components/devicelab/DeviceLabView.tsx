@@ -87,19 +87,32 @@ function HomePage({ onOpen, onOpenBench }: { onOpen: (kind: DeviceKind) => void;
                 onClick={() => onOpenBench(bench.id)}
                 className="lesson-card hover-lift group rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] p-3 text-left transition-all hover:border-[var(--accent-link)] hover:shadow-sm"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--border-bright)] bg-[var(--bg-inset)]">
+                <div className="flex items-start gap-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-bright)] bg-[var(--bg-inset)]">
                     <Cable className="h-4 w-4 text-[var(--accent-link)]" strokeWidth={1.75} />
                   </div>
-                  <div>
-                    <div className="text-[13px] font-bold text-[var(--text-primary)]">{bench.title}</div>
-                    <div className="text-[10.5px] text-[var(--text-dim)]">{bench.subtitle}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="text-[13px] font-bold leading-tight text-[var(--text-primary)]">
+                        {bench.title}
+                      </div>
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        {bench.level != null && (
+                          <span className="rounded-full border border-[var(--border-bright)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--text-dim)]">
+                            Lab {bench.level}
+                          </span>
+                        )}
+                        {complete && (
+                          <span className="rounded-full border border-[var(--status-up)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--status-up)]">
+                            Done
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-[10.5px] leading-snug text-[var(--text-dim)]">
+                      {bench.subtitle}
+                    </div>
                   </div>
-                  {complete && (
-                    <span className="ml-auto rounded-full border border-[var(--status-up)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[var(--status-up)]">
-                      Done
-                    </span>
-                  )}
                 </div>
                 <p className="mt-2 text-[11.5px] leading-snug text-[var(--text-secondary)]">{bench.blurb}</p>
               </button>

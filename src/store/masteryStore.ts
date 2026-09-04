@@ -16,6 +16,9 @@ export type ConceptId =
   | 'network-addresses'
   | 'default-gateways'
   | 'routing'
+  | 'tcp'
+  | 'udp'
+  | 'ports'
 
 export const CONCEPT_LABELS: Record<ConceptId, string> = {
   'ipv4-addressing': 'IPv4 addressing',
@@ -24,6 +27,9 @@ export const CONCEPT_LABELS: Record<ConceptId, string> = {
   'network-addresses': 'Network & broadcast',
   'default-gateways': 'Default gateways',
   routing: 'Routing',
+  tcp: 'TCP',
+  udp: 'UDP',
+  ports: 'Ports & sockets',
 }
 
 export const CONCEPT_ORDER: ConceptId[] = [
@@ -33,6 +39,9 @@ export const CONCEPT_ORDER: ConceptId[] = [
   'network-addresses',
   'default-gateways',
   'routing',
+  'tcp',
+  'udp',
+  'ports',
 ]
 
 type Scores = Record<ConceptId, number>
@@ -44,6 +53,9 @@ const EMPTY: Scores = {
   'network-addresses': 0,
   'default-gateways': 0,
   routing: 0,
+  tcp: 0,
+  udp: 0,
+  ports: 0,
 }
 
 interface MasteryState {

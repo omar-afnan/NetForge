@@ -70,6 +70,44 @@ const STATIC: Record<string, ExplainContent> = {
       'It only has meaning on the local link - every routed hop rewrites the frame with new MAC addresses.',
     ],
   },
+  tcp: {
+    title: 'TCP',
+    body: [
+      'Transmission Control Protocol. Connection-oriented and reliable: it sets up a connection with a handshake, numbers every byte, and resends anything the other end does not acknowledge.',
+      'The application receives a clean, in-order stream. Used by HTTP, SSH, email and file transfer.',
+    ],
+    facts: [
+      ['Header', '20+ bytes'],
+      ['Handshake', 'SYN / SYN-ACK / ACK'],
+      ['Delivery', 'Guaranteed, ordered'],
+    ],
+  },
+  udp: {
+    title: 'UDP',
+    body: [
+      'User Datagram Protocol. Connectionless and best-effort: no handshake, no acknowledgements, no retransmission.',
+      'An 8-byte header and your data. If a datagram is lost, UDP does not notice - the application copes, or does not need to. Used by DNS, VoIP, video and games.',
+    ],
+    facts: [
+      ['Header', '8 bytes'],
+      ['Handshake', 'none'],
+      ['Delivery', 'Best-effort'],
+    ],
+  },
+  handshake: {
+    title: 'Three-way handshake',
+    body: [
+      'How TCP opens a connection. SYN: the client proposes a starting sequence number. SYN-ACK: the server acknowledges it and proposes its own. ACK: the client acknowledges the server.',
+      'Only after all three does data flow. The ACK number always means "the next byte I expect from you".',
+    ],
+  },
+  port: {
+    title: 'Port number',
+    body: [
+      'A 16-bit number that identifies one application on a host. The IP address gets a packet to the machine; the destination port gets it to the right program.',
+      'Servers listen on well-known ports (80 HTTP, 443 HTTPS, 53 DNS, 22 SSH); clients use a random high-numbered port for each connection.',
+    ],
+  },
   route: {
     title: 'Route',
     body: [

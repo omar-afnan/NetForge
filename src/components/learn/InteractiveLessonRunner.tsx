@@ -13,6 +13,9 @@ import { MaskDerivation } from '@/components/learn/interactive/MaskDerivation'
 import { BoundaryBorrowAnimation } from '@/components/learn/interactive/BoundaryBorrowAnimation'
 import { SubnetSplitter } from '@/components/learn/interactive/SubnetSplitter'
 import { AddressBreakdownCard } from '@/components/learn/interactive/AddressBreakdownCard'
+import { TcpHandshakeWidget } from '@/components/learn/interactive/TcpHandshakeWidget'
+import { TcpReliabilityWidget } from '@/components/learn/interactive/TcpReliabilityWidget'
+import { TransportCompareWidget } from '@/components/learn/interactive/TransportCompareWidget'
 import { SubnetDesignChallenge } from '@/components/learn/SubnetDesignChallenge'
 import { useLearnProgress } from '@/store/progressStore'
 import { bumpConcept, useConceptMastery } from '@/store/masteryStore'
@@ -25,6 +28,9 @@ const WIDGETS: Record<WidgetKey, (props: Record<string, unknown>) => React.React
   'boundary-borrow': (p) => <BoundaryBorrowAnimation {...p} />,
   'subnet-splitter': (p) => <SubnetSplitter {...p} />,
   'address-breakdown': (p) => <AddressBreakdownCard {...p} />,
+  'tcp-handshake': () => <TcpHandshakeWidget />,
+  'tcp-reliability': (p) => <TcpReliabilityWidget {...p} />,
+  'transport-compare': () => <TransportCompareWidget />,
 }
 
 const KIND_LABEL: Record<InteractiveStep['kind'], string> = {
@@ -105,7 +111,7 @@ export function InteractiveLessonRunner({
       <div className="flex h-full flex-col overflow-hidden">
         <StepRail lesson={lesson} index={index} progressPct={progressPct} />
         <div className="min-h-0 flex-1">
-          <SubnetDesignChallenge onExit={goBack} />
+          <SubnetDesignChallenge onExit={goBack} {...(step.widgetProps ?? {})} />
         </div>
         <div className="flex items-center justify-between border-t border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-2.5">
           <Button variant="secondary" size="sm" onClick={goBack}>

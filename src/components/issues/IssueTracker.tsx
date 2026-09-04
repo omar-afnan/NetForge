@@ -3,13 +3,18 @@ import {
   AlertTriangle,
   CheckCircle2,
   FlaskConical,
+  Lightbulb,
+  MapPin,
+  MessageSquare,
   RefreshCw,
   Search,
   ShieldCheck,
   Sparkles,
   Wrench,
+  Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { RadioGroup, type RadioOption } from '@/components/ui/radio-group'
 import { useNetworkStore } from '@/store/networkStore'
 import { useCopilotStore } from '@/store/copilotStore'
 import { useUIStore } from '@/store/uiStore'
@@ -42,6 +47,19 @@ interface ToolResultView {
 }
 
 type WorkspaceStatus = 'investigating' | 'fixing' | 'resolved'
+
+/** One-line "what this category means" hints for the hypothesis radios. */
+const HYPOTHESIS_HINTS: Record<string, string> = {
+  ip: 'Wrong, missing or duplicate host address',
+  subnet: 'Mask too wide or too narrow for the network',
+  gateway: 'No gateway, or one that is off-subnet',
+  routing: 'No route to the destination network',
+  vlan: 'Ports in the wrong VLAN, or a trunk missing',
+  dhcp: 'No lease handed out, or a bad pool',
+  dns: 'The name does not resolve to the right address',
+  physical: 'Cable unplugged, port down or wrong port',
+  other: 'Something none of the above covers',
+}
 
 function Section({
   title,
@@ -432,107 +450,126 @@ export function IssueTracker() {
 
   /* ── Render ─────────────────────────────────────────────────── */
 
+  const passCount = matrix.filter((t) => t.success).length
+  const pathPct = matrix.length ? Math.round((passCount / matrix.length) * 100) : 0
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="panel-header flex items-center justify-between">
         <span>Issue Workspace</span>
-        <button
-          type="button"
-          disabled={scanning}
-          className="flex items-center gap-1.5 border border-[var(--border)] px-2 py-0.5 font-data text-[10px] font-normal normal-case tracking-normal text-[var(--text-secondary)] transition-colors hover:border-[var(--border-bright)] hover:text-[var(--text-primary)] disabled:opacity-60"
-          onClick={handleRescan}
-        >
-          <RefreshCw className={`h-3 w-3 ${scanning ? 'animate-spin' : ''}`} />
+        <Button variant="secondary" size="sm" disabled={scanning} onClick={handleRescan}>
+          <RefreshCw className={`h-3.5 w-3.5 ${scanning ? 'animate-spin' : ''}`} />
           {scanning ? 'Scanning…' : 'Re-scan'}
-        </button>
+        </Button>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-auto p-3">
+      <div className="flex-1 overflow-auto p-3 sm:p-4">
+       <div className="mx-auto w-full max-w-5xl space-y-3">
         {/* 1 · STATUS HEADER - honest three-state ticket, or a sandbox notice */}
         {isSandbox ? (
           <div className="panel border p-4">
-            <div className="flex items-center gap-2">
-              <FlaskConical className="h-4 w-4 text-[var(--accent-link)]" strokeWidth={1.75} />
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">
-                {devices.length === 0 ? 'Empty Workspace' : 'Baseline Sandbox'}
-              </span>
-              <span className={`ml-auto badge difficulty-${lab.difficulty}`}>{lab.difficulty}</span>
-              <span className="badge badge-cyan">No Faults</span>
-            </div>
-            <div className="mt-2 text-[12px] leading-relaxed text-[var(--text-secondary)]">
-              {devices.length === 0
-                ? 'No topology loaded. Open the Lab Library and load a lab to start troubleshooting - this workspace only tracks a fault once one exists.'
-                : 'This is the baseline competition topology - every device, link and route is healthy by design. There is no fault to investigate here, so it never counts toward lab completion.'}
-            </div>
-            {devices.length > 0 && (
-              <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-data text-[10px] text-[var(--text-dim)]">
-                <span className="text-[var(--status-up)]">
-                  {matrix.filter((t) => t.success).length}/{matrix.length}
-                </span>
-                <span>endpoint pairs reachable</span>
-                <span>·</span>
-                <span>0 injected faults</span>
-                <span>·</span>
-                <span>{lab.title}</span>
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[var(--border-bright)] bg-[var(--bg-inset)]">
+                <FlaskConical className="h-5 w-5 text-[var(--accent-link)]" strokeWidth={1.75} />
               </div>
-            )}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">
+                    {devices.length === 0 ? 'Empty Workspace' : 'Baseline Sandbox'}
+                  </span>
+                  <span className="ml-auto flex items-center gap-1.5">
+                    <span className={`badge difficulty-${lab.difficulty}`}>{lab.difficulty}</span>
+                    <span className="badge badge-cyan">No Faults</span>
+                  </span>
+                </div>
+                <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--text-secondary)]">
+                  {devices.length === 0
+                    ? 'No topology loaded. Open the Lab Library and load a lab to start troubleshooting - this workspace only tracks a fault once one exists.'
+                    : 'This is the baseline competition topology - every device, link and route is healthy by design. There is no fault to investigate here, so it never counts toward lab completion.'}
+                </p>
+                {devices.length > 0 && (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-data text-[10px] text-[var(--text-dim)]">
+                    <span className="text-[var(--status-up)]">{passCount}/{matrix.length}</span>
+                    <span>endpoint pairs reachable</span>
+                    <span>·</span>
+                    <span>0 injected faults</span>
+                    <span>·</span>
+                    <span>{lab.title}</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="panel border p-4">
-            <div className="flex items-center gap-2">
-              {status === 'resolved' ? (
-                <CheckCircle2 className="h-4 w-4 text-[var(--status-up)]" strokeWidth={1.75} />
-              ) : status === 'fixing' ? (
-                <Wrench className="h-4 w-4 text-[var(--accent-link)]" strokeWidth={1.75} />
-              ) : (
-                <AlertTriangle className="h-4 w-4 text-[var(--status-warn)]" strokeWidth={1.75} />
-              )}
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">
-                {status === 'resolved' ? 'Resolved Issue' : 'Active Issue'}
-              </span>
-              <span className={`ml-auto badge difficulty-${lab.difficulty}`}>{lab.difficulty}</span>
-              <span className={`badge ${status === 'resolved' ? 'badge-completed' : 'badge-cyan'}`}>
-                {status === 'resolved' ? 'Resolved' : status === 'fixing' ? 'Fixing' : 'Investigating'}
-              </span>
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="font-data text-[13px] font-semibold text-[var(--text-primary)]">
-                {primaryDevice?.hostname ?? failingTest?.source ?? '-'}
-              </span>
-              <span className="text-[12px] text-[var(--text-secondary)]">
-                {status === 'resolved'
-                  ? 'Fault repaired - every connectivity test passes.'
-                  : failingTest
-                    ? `Cannot reach ${failingTest.destination}`
-                    : (issues[0]?.description ?? 'Running audit…')}
-              </span>
-            </div>
-            {/* honest progress meter - no need to hunt through the re-scan log */}
-            <div className="mt-2 flex items-center gap-2">
-              <div className="h-1 flex-1 overflow-hidden bg-[var(--border)]">
-                <div
-                  className={`h-full transition-all ${allPass ? 'bg-[var(--status-up)]' : 'bg-[var(--status-warn)]'}`}
-                  style={{
-                    width: `${matrix.length ? (matrix.filter((t) => t.success).length / matrix.length) * 100 : 0}%`,
-                  }}
-                />
+            <div className="flex items-start gap-3">
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-[var(--bg-inset)] ${
+                  status === 'resolved'
+                    ? 'border-[var(--status-up)]'
+                    : status === 'fixing'
+                      ? 'border-[var(--accent-link)]'
+                      : 'border-[var(--status-warn)]'
+                }`}
+              >
+                {status === 'resolved' ? (
+                  <CheckCircle2 className="h-5 w-5 text-[var(--status-up)]" strokeWidth={1.75} />
+                ) : status === 'fixing' ? (
+                  <Wrench className="h-5 w-5 text-[var(--accent-link)]" strokeWidth={1.75} />
+                ) : (
+                  <AlertTriangle className="h-5 w-5 text-[var(--status-warn)]" strokeWidth={1.75} />
+                )}
               </div>
-              <span className="font-data text-[10px] text-[var(--text-dim)]">
-                {matrix.filter((t) => t.success).length}/{matrix.length} paths
-              </span>
-            </div>
-            <div className="mt-1 font-data text-[10px] text-[var(--text-dim)]">
-              {lab.title} · {issues.length} audit finding{issues.length === 1 ? '' : 's'} · detected:{' '}
-              {failingTest ? 'connectivity failure' : (issues[0]?.detectedBy ?? 'config-audit')}
-            </div>
-            {allPass && !labComplete && status !== 'resolved' && (
-              <div className="mt-3 flex items-center gap-2 border border-[var(--status-up)] bg-[rgba(22,163,74,0.08)] px-3 py-2">
-                <ShieldCheck className="h-4 w-4 shrink-0 text-[var(--status-up)]" strokeWidth={1.75} />
-                <span className="text-[11px] text-[var(--text-secondary)]">
-                  Connectivity looks restored - verifying to confirm and close the ticket…
-                </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">
+                    {status === 'resolved' ? 'Resolved Issue' : 'Active Issue'}
+                  </span>
+                  <span className="ml-auto flex items-center gap-1.5">
+                    <span className={`badge difficulty-${lab.difficulty}`}>{lab.difficulty}</span>
+                    <span className={`badge ${status === 'resolved' ? 'badge-completed' : 'badge-cyan'}`}>
+                      {status === 'resolved' ? 'Resolved' : status === 'fixing' ? 'Fixing' : 'Investigating'}
+                    </span>
+                  </span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <span className="font-data text-[15px] font-semibold text-[var(--text-primary)]">
+                    {primaryDevice?.hostname ?? failingTest?.source ?? '-'}
+                  </span>
+                  <span className="text-[12px] text-[var(--text-secondary)]">
+                    {status === 'resolved'
+                      ? 'Fault repaired - every connectivity test passes.'
+                      : failingTest
+                        ? `Cannot reach ${failingTest.destination}`
+                        : (issues[0]?.description ?? 'Running audit…')}
+                  </span>
+                </div>
+                {/* honest progress meter - no need to hunt through the re-scan log */}
+                <div className="mt-2.5 flex items-center gap-2.5">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--bg-inset)]">
+                    <div
+                      className={`h-full rounded-full transition-all ${allPass ? 'bg-[var(--status-up)]' : 'bg-[var(--status-warn)]'}`}
+                      style={{ width: `${pathPct}%` }}
+                    />
+                  </div>
+                  <span className="font-data text-[10px] text-[var(--text-dim)]">
+                    {passCount}/{matrix.length} paths · {pathPct}%
+                  </span>
+                </div>
+                <div className="mt-1.5 font-data text-[10px] text-[var(--text-dim)]">
+                  {lab.title} · {issues.length} audit finding{issues.length === 1 ? '' : 's'} · detected:{' '}
+                  {failingTest ? 'connectivity failure' : (issues[0]?.detectedBy ?? 'config-audit')}
+                </div>
+                {allPass && !labComplete && status !== 'resolved' && (
+                  <div className="mt-3 flex items-center gap-2 rounded-[var(--radius)] border border-[var(--status-up)] bg-[rgba(22,163,74,0.08)] px-3 py-2">
+                    <ShieldCheck className="h-4 w-4 shrink-0 text-[var(--status-up)]" strokeWidth={1.75} />
+                    <span className="text-[11px] text-[var(--text-secondary)]">
+                      Connectivity looks restored - verifying to confirm and close the ticket…
+                    </span>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         )}
         {/* 2 · FAILURE POINT + 3 · EVIDENCE */}
@@ -563,9 +600,10 @@ export function IssueTracker() {
                     ? `Traffic stops at ${failurePoint.hops[failurePoint.failedHopIndex].device}${failurePoint.reason ? ` - ${failurePoint.reason}` : ''}`
                     : 'No failure on this path right now.'}
                 </div>
-                <button
-                  type="button"
-                  className="mt-2 border border-[var(--border-bright)] px-2 py-1 font-data text-[10px] text-[var(--accent-link)] transition-colors hover:bg-[rgba(46,200,240,0.1)]"
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="mt-2.5"
                   onClick={() => {
                     setPacketTrace({
                       id: crypto.randomUUID(),
@@ -575,8 +613,9 @@ export function IssueTracker() {
                     setActiveView('topology')
                   }}
                 >
-                  Show on topology →
-                </button>
+                  <MapPin className="h-3.5 w-3.5" />
+                  Show on topology
+                </Button>
               </div>
             ) : (
               <div className="text-[11px] text-[var(--text-dim)]">No failing path detected.</div>
@@ -676,21 +715,15 @@ export function IssueTracker() {
                   ),
               },
             ].map((tool) => (
-              <button
+              <Button
                 key={tool.id}
-                type="button"
+                variant={busyTool === tool.id ? 'accent' : 'primary'}
+                size="sm"
                 disabled={tool.disabled || busyTool !== null}
                 onClick={tool.run}
-                className={`border px-2.5 py-1.5 font-data text-[11px] transition-colors ${
-                  tool.disabled
-                    ? 'cursor-not-allowed border-[var(--border)] text-[var(--text-dim)]'
-                    : busyTool === tool.id
-                      ? 'border-[var(--accent-link)] text-[var(--accent-link)]'
-                      : 'border-[var(--border-bright)] text-[var(--text-primary)] hover:border-[var(--accent-link)] hover:text-[var(--accent-link)]'
-                }`}
               >
                 {busyTool === tool.id ? 'Running…' : tool.label}
-              </button>
+              </Button>
             ))}
           </div>
 
@@ -712,20 +745,24 @@ export function IssueTracker() {
 
         {/* 6 · HYPOTHESIS */}
         <Section title="What do you think is wrong?" icon={Search}>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {HYPOTHESIS_CATEGORIES.map((category) => (
-              <label key={category.id} className="flex cursor-pointer items-center gap-1.5 text-[12px] text-[var(--text-secondary)]">
-                <input
-                  type="radio"
-                  name="hypothesis"
-                  className="accent-[var(--accent-link)]"
-                  checked={hypothesis === category.id}
-                  onChange={() => setHypothesis(category.id)}
-                />
-                {category.label}
-              </label>
-            ))}
-          </div>
+          <p className="mb-2.5 text-[11px] leading-relaxed text-[var(--text-dim)]">
+            Commit to a theory before you reach for the AI - you learn more proving (or
+            disproving) your own hunch.
+          </p>
+          <RadioGroup
+            name="hypothesis"
+            ariaLabel="What do you think is wrong?"
+            columns={3}
+            value={hypothesis}
+            onChange={(v) => setHypothesis(v as IssueCategory)}
+            options={HYPOTHESIS_CATEGORIES.map(
+              (category): RadioOption => ({
+                value: category.id,
+                label: category.label,
+                hint: HYPOTHESIS_HINTS[category.id],
+              }),
+            )}
+          />
           <Button
             variant="accent"
             size="sm"
@@ -744,26 +781,32 @@ export function IssueTracker() {
 
         {/* 7 · AI ASSISTANCE - progressive, non-blocking */}
         <Section title="NetForge AI" icon={Sparkles}>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button
+              variant="primary"
+              size="sm"
+              className="justify-start"
               disabled={aiBusy}
-              className="border border-[var(--border-bright)] px-2.5 py-1.5 text-[11px] transition-colors hover:border-[var(--accent-link)] disabled:cursor-not-allowed disabled:text-[var(--text-dim)]"
               onClick={() => void giveHint()}
             >
-              {aiBusy ? 'Thinking…' : '💡 Give Me a Hint'}{!aiBusy && hintLevel > 0 ? ` (${Math.min(hintLevel + 1, 3)}/3)` : ''}
-            </button>
-            <button
-              type="button"
+              <Lightbulb className="h-3.5 w-3.5 text-[var(--accent-amber)]" />
+              {aiBusy ? 'Thinking…' : 'Give me a hint'}
+              {!aiBusy && hintLevel > 0 ? ` (${Math.min(hintLevel + 1, 3)}/3)` : ''}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              className="justify-start"
               disabled={aiBusy}
-              className="border border-[var(--border-bright)] px-2.5 py-1.5 text-[11px] transition-colors hover:border-[var(--accent-link)] disabled:cursor-not-allowed disabled:text-[var(--text-dim)]"
               onClick={() => void explainEvidence()}
             >
-              {aiBusy ? 'Thinking…' : '🔎 Explain the Evidence'}
-            </button>
-            <button
-              type="button"
-              className="border border-[var(--border-bright)] px-2.5 py-1.5 text-[11px] transition-colors hover:border-[var(--accent-link)]"
+              <Search className="h-3.5 w-3.5 text-[var(--accent-link)]" />
+              {aiBusy ? 'Thinking…' : 'Explain the evidence'}
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              className="justify-start"
               onClick={() =>
                 copilot.pushMessage({
                   id: crypto.randomUUID(),
@@ -773,19 +816,22 @@ export function IssueTracker() {
                 })
               }
             >
-              🤖 Ask AI (chat →)
-            </button>
-            <button
-              type="button"
+              <MessageSquare className="h-3.5 w-3.5 text-[var(--accent-link)]" />
+              Ask AI (chat →)
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              className="justify-start hover:border-[var(--accent-amber)]"
               disabled={copilot.labAssist.busy}
-              className="border border-[var(--border-bright)] px-2.5 py-1.5 text-[11px] transition-colors hover:border-[var(--accent-amber)] disabled:cursor-not-allowed disabled:text-[var(--text-dim)]"
               onClick={aiInvestigate}
             >
-              ⚡ Let AI Investigate
-            </button>
+              <Zap className="h-3.5 w-3.5 text-[var(--accent-amber)]" />
+              Let AI investigate
+            </Button>
           </div>
           {inlineAi && (
-            <div className="mt-2 border border-[var(--border)] bg-[var(--bg-inset)] p-2 text-[11px] leading-relaxed whitespace-pre-wrap text-[var(--text-secondary)]">
+            <div className="mt-2.5 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--bg-inset)] p-2.5 text-[11px] leading-relaxed whitespace-pre-wrap text-[var(--text-secondary)]">
               {inlineAi}
             </div>
           )}
@@ -827,7 +873,7 @@ export function IssueTracker() {
                   ))}
                 </div>
                 {status === 'resolved' ? (
-                  <div className="mt-2 flex items-center gap-2 border border-[var(--status-up)] bg-[rgba(22,163,74,0.08)] px-3 py-2">
+                  <div className="mt-2 flex items-center gap-2 rounded-[var(--radius)] border border-[var(--status-up)] bg-[rgba(22,163,74,0.08)] px-3 py-2">
                     <CheckCircle2 className="h-4 w-4 text-[var(--status-up)]" strokeWidth={1.75} />
                     <span className="text-[12px] font-semibold text-[var(--status-up)]">
                       ALL TESTS PASSED - 🎉 ISSUE RESOLVED
@@ -838,14 +884,16 @@ export function IssueTracker() {
                     Not all tests pass yet - keep investigating.
                   </div>
                 )}
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="mt-2.5"
                   disabled={busyTool !== null}
-                  className="mt-2 border border-[var(--border-bright)] px-2.5 py-1 font-data text-[10px] text-[var(--accent-link)] transition-colors hover:bg-[rgba(46,200,240,0.1)] disabled:text-[var(--text-dim)]"
                   onClick={() => void runVerification()}
                 >
-                  {busyTool === 'verify' ? 'Verifying…' : 'Run Verification'}
-                </button>
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  {busyTool === 'verify' ? 'Verifying…' : 'Run verification'}
+                </Button>
               </div>
             ) : (
               <div className="text-[11px] text-[var(--text-dim)]">
@@ -879,6 +927,7 @@ export function IssueTracker() {
             </ul>
           </Section>
         )}
+       </div>
       </div>
     </div>
   )

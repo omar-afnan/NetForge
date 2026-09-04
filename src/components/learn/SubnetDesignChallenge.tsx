@@ -8,16 +8,16 @@ import { bumpConcept } from '@/store/masteryStore'
 import { celebrateLab } from '@/lib/celebrate'
 
 /**
- * Practice Mode for the IPv4 & CIDR lesson. The learner sizes a subnet for
- * each department out of one /24, gets live capacity feedback, and on
+ * Practice Mode for the subnetting lessons. The learner sizes a subnet for
+ * each department out of one base block, gets live capacity feedback, and on
  * "Validate" is told - in networking terms - exactly why a plan does or does
  * not work. Self-contained: no live simulator this phase, but a hand-off
  * button drops them into the Device Lab mask exercise.
+ *
+ * Defaults reproduce the original IPv4 & CIDR practice (a /24 for four
+ * departments). Pass `base` / `departments` / `title` to run a different
+ * scenario (e.g. from the Subnetting Practice ladder).
  */
-
-const BASE = '192.168.10.0/24'
-const BASE_INT = ipToInt('192.168.10.0')
-const BASE_SIZE = 256
 
 interface Dept {
   id: string
@@ -25,39 +25,44 @@ interface Dept {
   need: number
 }
 
-const DEPARTMENTS: Dept[] = [
+const DEFAULT_BASE = '192.168.10.0/24'
+const DEFAULT_DEPARTMENTS: Dept[] = [
   { id: 'sales', name: 'Sales', need: 50 },
   { id: 'it', name: 'IT', need: 25 },
   { id: 'hr', name: 'HR', need: 10 },
   { id: 'mgmt', name: 'Management', need: 5 },
 ]
 
-const MIN_PREFIX = 24
 const MAX_PREFIX = 30
 
 interface Placed extends Dept {
   prefix: number
   usable: number
   size: number
-  /** Byte offset within the /24, or -1 if it did not fit. */
+  /** Byte offset within the base block, or -1 if it did not fit. */
   offset: number
   network: string
   broadcast: string
 }
 
 /** Greedy aligned allocation in list order - mirrors how you'd hand-plan it. */
-function allocate(prefixes: Record<string, number>): { placed: Placed[]; cursor: number } {
+function allocate(
+  prefixes: Record<string, number>,
+  departments: Dept[],
+  baseInt: number,
+  baseSize: number,
+): { placed: Placed[]; cursor: number } {
   let cursor = 0
-  const placed = DEPARTMENTS.map((d) => {
+  const placed = departments.map((d) => {
     const prefix = prefixes[d.id]
     const facts = describePrefix(prefix)
     const size = facts.totalAddresses
     // align cursor up to a multiple of the block size
     const aligned = Math.ceil(cursor / size) * size
-    const fits = aligned + size <= BASE_SIZE
+    const fits = aligned + size <= baseSize
     const offset = fits ? aligned : -1
     if (fits) cursor = aligned + size
-    const netIp = fits ? intToIp((BASE_INT + aligned) >>> 0) : '-'
+    const netIp = fits ? intToIp((baseInt + aligned) >>> 0) : '-'
     const b = fits ? addressBreakdown(netIp, prefix) : null
     return {
       ...d,
@@ -72,13 +77,32 @@ function allocate(prefixes: Record<string, number>): { placed: Placed[]; cursor:
   return { placed, cursor }
 }
 
-export function SubnetDesignChallenge({ onExit }: { onExit?: () => void }) {
+export function SubnetDesignChallenge({
+  onExit,
+  base = DEFAULT_BASE,
+  departments = DEFAULT_DEPARTMENTS,
+  title,
+}: {
+  onExit?: () => void
+  base?: string
+  departments?: Dept[]
+  title?: string
+}) {
+  const [baseNetwork, basePrefixStr] = base.split('/')
+  const basePrefix = Number(basePrefixStr)
+  const baseInt = useMemo(() => ipToInt(baseNetwork), [baseNetwork])
+  const baseSize = describePrefix(basePrefix).totalAddresses
+  const minPrefix = basePrefix
+
   const [prefixes, setPrefixes] = useState<Record<string, number>>(() =>
-    Object.fromEntries(DEPARTMENTS.map((d) => [d.id, 26])),
+    Object.fromEntries(departments.map((d) => [d.id, Math.min(MAX_PREFIX, Math.max(minPrefix, 26))])),
   )
   const [checked, setChecked] = useState(false)
 
-  const { placed, cursor } = useMemo(() => allocate(prefixes), [prefixes])
+  const { placed, cursor } = useMemo(
+    () => allocate(prefixes, departments, baseInt, baseSize),
+    [prefixes, departments, baseInt, baseSize],
+  )
 
   const problems = useMemo(() => {
     const out: string[] = []
@@ -94,13 +118,13 @@ export function SubnetDesignChallenge({ onExit }: { onExit?: () => void }) {
         )
       }
     }
-    if (cursor > BASE_SIZE) {
+    if (cursor > baseSize) {
       out.push(
-        `The plan reserves ${cursor} addresses, but ${BASE} only has ${BASE_SIZE}. Make the larger subnets tighter.`,
+        `The plan reserves ${cursor} addresses, but ${base} only has ${baseSize}. Make the larger subnets tighter.`,
       )
     }
     return out
-  }, [placed, cursor])
+  }, [placed, cursor, base, baseSize])
 
   const solved = checked && problems.length === 0
 
@@ -118,14 +142,14 @@ export function SubnetDesignChallenge({ onExit }: { onExit?: () => void }) {
     setChecked(false)
     setPrefixes((prev) => ({
       ...prev,
-      [id]: Math.max(MIN_PREFIX, Math.min(MAX_PREFIX, prev[id] + delta)),
+      [id]: Math.max(minPrefix, Math.min(MAX_PREFIX, prev[id] + delta)),
     }))
   }
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="panel-header flex items-center justify-between">
-        <span>Practice · Design an office network</span>
+        <span>Practice · {title ?? 'Design an office network'}</span>
         {onExit && (
           <button
             type="button"
@@ -140,12 +164,12 @@ export function SubnetDesignChallenge({ onExit }: { onExit?: () => void }) {
       <div className="flex-1 overflow-auto p-4">
         <div className="mx-auto max-w-2xl">
           <p className="text-[12px] leading-relaxed text-[var(--text-secondary)]">
-            You are wiring a small office. You have been given{' '}
-            <span className="font-data text-[var(--text-primary)]">{BASE}</span>. Size a subnet for
+            You are wiring an office. You have been given{' '}
+            <span className="font-data text-[var(--text-primary)]">{base}</span>. Size a subnet for
             each department - big enough for its hosts, no bigger than it needs.
           </p>
 
-          {/* the /24 as one bar */}
+          {/* the base block as one bar */}
           <div className="mt-4">
             <div className="flex h-9 w-full overflow-hidden border border-[var(--border)]">
               {placed.map((p) =>
@@ -154,7 +178,7 @@ export function SubnetDesignChallenge({ onExit }: { onExit?: () => void }) {
                     key={p.id}
                     className="flex items-center justify-center border-r border-[var(--bg-root)] transition-all duration-300 last:border-r-0"
                     style={{
-                      flexBasis: `${(p.size / BASE_SIZE) * 100}%`,
+                      flexBasis: `${(p.size / baseSize) * 100}%`,
                       background:
                         p.usable < p.need
                           ? 'color-mix(in srgb, var(--status-down) 22%, var(--bg-inset))'
@@ -167,10 +191,10 @@ export function SubnetDesignChallenge({ onExit }: { onExit?: () => void }) {
                   </div>
                 ),
               )}
-              {cursor < BASE_SIZE && (
+              {cursor < baseSize && (
                 <div
                   className="flex items-center justify-center bg-[var(--bg-inset)]"
-                  style={{ flexBasis: `${((BASE_SIZE - cursor) / BASE_SIZE) * 100}%` }}
+                  style={{ flexBasis: `${((baseSize - cursor) / baseSize) * 100}%` }}
                 >
                   <span className="font-data text-[9px] text-[var(--text-dim)]">free</span>
                 </div>
@@ -179,9 +203,9 @@ export function SubnetDesignChallenge({ onExit }: { onExit?: () => void }) {
             <div className="mt-1 flex justify-between font-data text-[9px] text-[var(--text-dim)]">
               <span>.0</span>
               <span>
-                {Math.min(cursor, BASE_SIZE)} / {BASE_SIZE} used
+                {Math.min(cursor, baseSize)} / {baseSize} used
               </span>
-              <span>.255</span>
+              <span>.{baseSize - 1 > 255 ? 'end' : baseSize - 1}</span>
             </div>
           </div>
 
@@ -221,7 +245,7 @@ export function SubnetDesignChallenge({ onExit }: { onExit?: () => void }) {
                       <button
                         type="button"
                         onClick={() => step(p.id, -1)}
-                        disabled={p.prefix <= MIN_PREFIX}
+                        disabled={p.prefix <= minPrefix}
                         className="flex h-7 w-7 items-center justify-center text-[var(--text-secondary)] hover:text-[var(--accent-link)] disabled:opacity-30"
                         aria-label={`Larger subnet for ${p.name}`}
                       >

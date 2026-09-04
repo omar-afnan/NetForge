@@ -35,9 +35,11 @@ export interface CurriculumModule {
   /** Placeholder modules planned for a future release. */
   comingSoon?: boolean
   /**
-   * Id of an interactive concept lab (see src/data/lessons/) offered above the
-   * text lessons for this module. Currently only 'ipv4-cidr'.
+   * Ids of interactive concept labs (see src/data/lessons/) offered above the
+   * text lessons for this module, e.g. ['ipv4-cidr', 'subnetting-practice'].
    */
+  interactiveLessonIds?: string[]
+  /** @deprecated use interactiveLessonIds. Still read for back-compat. */
   interactiveLessonId?: string
   lessons: Lesson[]
 }
@@ -262,7 +264,7 @@ export const CURRICULUM: CurriculumModule[] = [
     title: 'Subnetting',
     blurb: 'Splitting one network into many: prefix lengths, borrowing bits, and calculating ranges fast.',
     relatedLabIds: ['subnetting-lab'],
-    interactiveLessonId: 'ipv4-cidr',
+    interactiveLessonIds: ['ipv4-cidr', 'subnetting-practice'],
     lessons: [
       {
         id: 'prefix-lengths',
@@ -490,6 +492,7 @@ export const CURRICULUM: CurriculumModule[] = [
     title: 'TCP / UDP',
     blurb: 'Ports, sockets, reliability and the three-way handshake.',
     relatedLabIds: ['tcp-handshake-lab'],
+    interactiveLessonIds: ['tcp', 'udp', 'tcp-udp-choose'],
     lessons: [
       {
         id: 'ports-and-sockets',

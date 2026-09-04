@@ -1,58 +1,19 @@
-import type { ConceptId } from '@/store/masteryStore'
-
 /**
  * The flagship interactive concept lab: "Understanding IPv4 & CIDR".
  *
- * A lesson is an ordered list of steps. Each step is one small idea shown as
- * visual -> short explanation -> interaction -> (sometimes) a checkpoint
- * question. The runner (InteractiveLessonRunner) mounts one step at a time and
- * only unlocks "Next" on a question once it is answered correctly.
+ * The lesson data shape (steps, widgets, checkpoint questions) lives in
+ * ./types and is shared by every interactive concept lab. Re-exported here so
+ * existing imports from '@/data/lessons/ipv4-cidr' keep working.
  */
 
-export type WidgetKey =
-  | 'octet-bits'
-  | 'cidr-explorer'
-  | 'mask-derivation'
-  | 'boundary-borrow'
-  | 'subnet-splitter'
-  | 'address-breakdown'
+export type {
+  WidgetKey,
+  StepQuestion,
+  InteractiveStep,
+  InteractiveLesson,
+} from './types'
 
-export interface StepQuestion {
-  prompt: string
-  options: string[]
-  answerIndex: number
-  /** Always a networking reason, never just "wrong". Shown on any answer. */
-  explain: string
-}
-
-export interface InteractiveStep {
-  id: string
-  kind: 'teach' | 'demo' | 'interact' | 'question' | 'practice'
-  title: string
-  /** 1-3 short sentences. No walls of text. */
-  body?: string
-  /** Static monospace diagram shown under the body. */
-  diagram?: string
-  widget?: WidgetKey
-  widgetProps?: Record<string, unknown>
-  question?: StepQuestion
-  /** Mastery concept this step reinforces. */
-  concept?: ConceptId
-}
-
-export interface InteractiveLesson {
-  id: string
-  /** Cosmetic lab number for the intro screen. */
-  labNumber: string
-  title: string
-  subtitle: string
-  minutes: number
-  /** "What you'll learn" checklist on the intro screen. */
-  outcomes: string[]
-  /** Concepts this lesson tops up when completed. */
-  concepts: ConceptId[]
-  steps: InteractiveStep[]
-}
+import type { InteractiveLesson } from './types'
 
 export const IPV4_CIDR_LESSON: InteractiveLesson = {
   id: 'ipv4-cidr',

@@ -13,9 +13,19 @@
  * 3D renderer and the cable layer derive every position from the same numbers.
  */
 
-export type PortKind = 'power' | 'wan' | 'lan' | 'nic' | 'uplink'
+export type PortKind = 'power' | 'wan' | 'lan' | 'nic' | 'uplink' | 'radio'
 export type PortFace = 'front' | 'back' | 'left' | 'right' | 'top'
-export type NodeIcon = 'outlet' | 'modem' | 'router' | 'switch' | 'laptop' | 'desktop'
+export type NodeIcon =
+  | 'outlet'
+  | 'modem'
+  | 'router'
+  | 'switch'
+  | 'laptop'
+  | 'desktop'
+  | 'pc'
+  | 'accesspoint'
+  | 'printer'
+  | 'phone'
 
 export interface BenchPort {
   id: string
@@ -47,9 +57,13 @@ export interface BenchStep {
   title: string
   instruction: string
   why: string
-  /** 'connect' = run a cable between two ports; 'power' = press a node's power button. */
-  type: 'connect' | 'power'
-  /** For 'connect': the two port ids (order-independent). */
+  /**
+   * 'connect'    = run a cable between two ports.
+   * 'power'      = press a node's power button.
+   * 'fix-remove' = click an existing (wrongly-placed) cable to unplug it.
+   */
+  type: 'connect' | 'power' | 'fix-remove'
+  /** For 'connect' and 'fix-remove': the two port ids (order-independent). */
   from?: string
   to?: string
   /** For 'power': the node id to switch on. */
@@ -65,6 +79,14 @@ export interface Bench {
   blurb: string
   /** Shown on the completion screen. */
   outro: string
+  /** Rough difficulty order, 1 = easiest. Shown as a small pill. */
+  level?: number
+  /** Troubleshooting benches: the reported fault, shown above the steps. */
+  symptom?: string
+  /** Cables already present when the bench loads (troubleshooting scenarios). */
+  initialCables?: { from: string; to: string; cable?: 'power' | 'data' }[]
+  /** Node ids already powered on when the bench loads. */
+  initialPowered?: string[]
   nodes: BenchNode[]
   steps: BenchStep[]
 }
@@ -76,6 +98,7 @@ export const BENCHES: Bench[] = [
     subtitle: 'Router · modem · laptop',
     blurb: 'Cable a home network from scratch: power the router, bring up the internet feed, then plug in a laptop.',
     outro: 'That is exactly how a home network comes online: power first, then the internet uplink (WAN), then your devices on the LAN ports.',
+    level: 1,
     nodes: [
       {
         id: 'modem',
@@ -166,6 +189,7 @@ export const BENCHES: Bench[] = [
     subtitle: 'Switch · router · desktop',
     blurb: 'Wire a small office: power a switch, uplink it to the router, then hang a desktop PC off a switch port.',
     outro: 'A switch multiplies one router LAN port into many. Power it, uplink it once, and every desktop you plug in joins the same network.',
+    level: 2,
     nodes: [
       {
         id: 'router',
@@ -247,6 +271,661 @@ export const BENCHES: Bench[] = [
         from: 'desktop-nic',
         to: 'switch-p3',
         cable: 'data',
+      },
+    ],
+  },
+
+  // ── LAB 3 ────────────────────────────────────────────────────────────────
+  {
+    id: 'small-office',
+    title: 'Small Office Network',
+    subtitle: 'Modem · router · switch · 2 PCs · laptop · printer',
+    blurb: 'The router and internet feed are already up. Add the switch and fan out to every desk: two PCs, a laptop and a printer.',
+    outro: 'One router uplink, one switch, many devices. Every end device on the switch shares that single path to the router and the internet - that is the shape of almost every small LAN.',
+    level: 3,
+    initialPowered: ['router'],
+    initialCables: [
+      { from: 'router-power', to: 'outlet-socket-b', cable: 'power' },
+      { from: 'modem-eth', to: 'router-wan', cable: 'data' },
+    ],
+    nodes: [
+      {
+        id: 'outlet',
+        label: 'Wall Outlet',
+        sub: 'Mains power',
+        icon: 'outlet',
+        pos: [-5.2, 0.4],
+        size: [0.4, 1.3, 0.95],
+        ports: [
+          { id: 'outlet-socket-a', label: 'Socket A', kind: 'power', face: 'right', u: 0.32, v: 0.5 },
+          { id: 'outlet-socket-b', label: 'Socket B', kind: 'power', face: 'right', u: 0.7, v: 0.5 },
+        ],
+      },
+      {
+        id: 'modem',
+        label: 'ISP Modem',
+        sub: 'Internet feed',
+        icon: 'modem',
+        pos: [-1.8, -3.4],
+        size: [2, 0.45, 1.1],
+        ports: [{ id: 'modem-eth', label: 'Ethernet out', kind: 'wan', face: 'front', u: 0.5, v: 0.5 }],
+      },
+      {
+        id: 'router',
+        label: 'Office Router',
+        sub: 'Internet gateway',
+        icon: 'router',
+        pos: [-1.8, -1.4],
+        size: [2.2, 0.5, 1.4],
+        needsPower: true,
+        ports: [
+          { id: 'router-power', label: 'DC power in', kind: 'power', face: 'front', u: 0.2, v: 0.4 },
+          { id: 'router-wan', label: 'WAN', kind: 'wan', face: 'top', u: 0.5, v: 0.2 },
+          { id: 'router-lan1', label: 'LAN 1', kind: 'lan', face: 'right', u: 0.7, v: 0.4 },
+        ],
+      },
+      {
+        id: 'switch',
+        label: '8-Port Switch',
+        sub: 'Desk network',
+        icon: 'switch',
+        pos: [-1.8, 1.1],
+        size: [3, 0.4, 1.4],
+        needsPower: true,
+        ports: [
+          { id: 'switch-power', label: 'Power in', kind: 'power', face: 'front', u: 0.16, v: 0.4 },
+          { id: 'switch-uplink', label: 'Uplink', kind: 'uplink', face: 'top', u: 0.5, v: 0.2 },
+          { id: 'switch-p1', label: 'Port 1', kind: 'lan', face: 'front', u: 0.45, v: 0.45 },
+          { id: 'switch-p2', label: 'Port 2', kind: 'lan', face: 'front', u: 0.62, v: 0.45 },
+          { id: 'switch-p3', label: 'Port 3', kind: 'lan', face: 'right', u: 0.5, v: 0.4 },
+          { id: 'switch-p4', label: 'Port 4', kind: 'lan', face: 'back', u: 0.5, v: 0.45 },
+        ],
+      },
+      {
+        id: 'pc1',
+        label: 'PC-1',
+        sub: 'Workstation',
+        icon: 'desktop',
+        pos: [2.6, -1.8],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'pc1-nic', label: 'Ethernet', kind: 'nic', face: 'front', u: 0.3, v: 0.45 }],
+      },
+      {
+        id: 'pc2',
+        label: 'PC-2',
+        sub: 'Workstation',
+        icon: 'pc',
+        pos: [2.6, 0.2],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'pc2-nic', label: 'Ethernet', kind: 'nic', face: 'front', u: 0.3, v: 0.45 }],
+      },
+      {
+        id: 'laptop',
+        label: 'Laptop',
+        sub: 'Hot desk',
+        icon: 'laptop',
+        pos: [2.6, 2.2],
+        size: [1.7, 0.12, 1.2],
+        ports: [{ id: 'laptop-nic', label: 'Ethernet', kind: 'nic', face: 'front', u: 0.22, v: 0.6 }],
+      },
+      {
+        id: 'printer',
+        label: 'Printer',
+        sub: 'Shared',
+        icon: 'printer',
+        pos: [-1.8, 3.3],
+        size: [1.4, 0.9, 1.1],
+        ports: [{ id: 'printer-nic', label: 'Ethernet', kind: 'nic', face: 'front', u: 0.7, v: 0.5 }],
+      },
+    ],
+    steps: [
+      {
+        id: 's1',
+        title: 'Power the switch',
+        instruction: "Run the power cable from the switch's power in to Socket A on the wall outlet.",
+        why: 'The router and its internet feed are already running. The switch is the next active device - it needs mains power before any port can pass a frame.',
+        type: 'connect',
+        from: 'switch-power',
+        to: 'outlet-socket-a',
+        cable: 'power',
+      },
+      {
+        id: 's2',
+        title: 'Power on the switch',
+        instruction: "Press the switch's power button.",
+        why: 'On boot the switch begins learning which MAC address lives on which port, so it can forward each frame to just one port instead of all of them.',
+        type: 'power',
+        target: 'switch',
+      },
+      {
+        id: 's3',
+        title: 'Uplink the switch to the router',
+        instruction: "Run an Ethernet cable from the switch's uplink port to LAN 1 on the router.",
+        why: 'This single cable is the whole switch\'s path to the router and the internet. Everything you plug into the switch shares it.',
+        type: 'connect',
+        from: 'switch-uplink',
+        to: 'router-lan1',
+        cable: 'data',
+      },
+      {
+        id: 's4',
+        title: 'Connect PC-1',
+        instruction: "Run an Ethernet cable from PC-1's NIC to Port 1 on the switch.",
+        why: 'Any numbered port behaves the same. The switch bridges Port 1 to the uplink, so PC-1 reaches the router.',
+        type: 'connect',
+        from: 'pc1-nic',
+        to: 'switch-p1',
+        cable: 'data',
+      },
+      {
+        id: 's5',
+        title: 'Connect PC-2',
+        instruction: "Run an Ethernet cable from PC-2's NIC to Port 2 on the switch.",
+        why: 'PC-1 and PC-2 are now on the same switch, so they can also talk directly to each other at layer 2 without troubling the router.',
+        type: 'connect',
+        from: 'pc2-nic',
+        to: 'switch-p2',
+        cable: 'data',
+      },
+      {
+        id: 's6',
+        title: 'Connect the laptop',
+        instruction: "Run an Ethernet cable from the laptop's NIC to Port 3 on the switch.",
+        why: 'A wired hot-desk port. Same network, same rules - the switch does not care what kind of device is on the far end.',
+        type: 'connect',
+        from: 'laptop-nic',
+        to: 'switch-p3',
+        cable: 'data',
+      },
+      {
+        id: 's7',
+        title: 'Connect the printer',
+        instruction: "Run an Ethernet cable from the printer's NIC to Port 4 on the switch.",
+        why: 'The printer is just another host on the LAN. Once it has an address, every device on the switch can send jobs to it.',
+        type: 'connect',
+        from: 'printer-nic',
+        to: 'switch-p4',
+        cable: 'data',
+      },
+    ],
+  },
+
+  // ── LAB 4 ────────────────────────────────────────────────────────────────
+  {
+    id: 'wireless-office',
+    title: 'Wireless Office',
+    subtitle: 'Router · switch · access point · desktop · laptop · phone',
+    blurb: 'Add Wi-Fi to a wired office. Cable the access point back to the switch, wire the desktop, then join the laptop and phone over the air.',
+    outro: 'An access point does not replace the wired network - it extends it. Wi-Fi only removes the cable between the client and the AP; the AP still needs a wire back to the switch.',
+    level: 4,
+    initialCables: [{ from: 'switch-uplink', to: 'router-lan1', cable: 'data' }],
+    nodes: [
+      {
+        id: 'outlet',
+        label: 'Wall Outlet',
+        sub: 'Mains power',
+        icon: 'outlet',
+        pos: [-5.2, 0.4],
+        size: [0.4, 1.3, 0.95],
+        ports: [
+          { id: 'outlet-socket-a', label: 'Socket A', kind: 'power', face: 'right', u: 0.32, v: 0.5 },
+          { id: 'outlet-socket-b', label: 'Socket B', kind: 'power', face: 'right', u: 0.7, v: 0.5 },
+        ],
+      },
+      {
+        id: 'router',
+        label: 'Office Router',
+        sub: 'Internet gateway',
+        icon: 'router',
+        pos: [-3, -2.6],
+        size: [2, 0.45, 1.1],
+        ports: [{ id: 'router-lan1', label: 'LAN 1', kind: 'lan', face: 'front', u: 0.5, v: 0.5 }],
+      },
+      {
+        id: 'switch',
+        label: '8-Port Switch',
+        sub: 'Wired core',
+        icon: 'switch',
+        pos: [-3, 0.4],
+        size: [2.8, 0.4, 1.4],
+        needsPower: true,
+        ports: [
+          { id: 'switch-power', label: 'Power in', kind: 'power', face: 'front', u: 0.18, v: 0.4 },
+          { id: 'switch-uplink', label: 'Uplink', kind: 'uplink', face: 'top', u: 0.5, v: 0.2 },
+          { id: 'switch-p1', label: 'Port 1', kind: 'lan', face: 'front', u: 0.55, v: 0.45 },
+          { id: 'switch-p2', label: 'Port 2', kind: 'lan', face: 'right', u: 0.5, v: 0.4 },
+        ],
+      },
+      {
+        id: 'ap',
+        label: 'Access Point',
+        sub: 'Wi-Fi',
+        icon: 'accesspoint',
+        pos: [1.6, 0.4],
+        size: [1.3, 0.35, 1.3],
+        needsPower: true,
+        ports: [
+          { id: 'ap-power', label: 'Power in', kind: 'power', face: 'front', u: 0.25, v: 0.5 },
+          { id: 'ap-uplink', label: 'LAN uplink', kind: 'uplink', face: 'back', u: 0.5, v: 0.5 },
+          { id: 'ap-radio', label: 'Wi-Fi (SSID)', kind: 'radio', face: 'top', u: 0.5, v: 0.5 },
+        ],
+      },
+      {
+        id: 'desktop',
+        label: 'Desktop PC',
+        sub: 'Wired',
+        icon: 'desktop',
+        pos: [-3, 3.2],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'desktop-nic', label: 'Ethernet', kind: 'nic', face: 'front', u: 0.3, v: 0.45 }],
+      },
+      {
+        id: 'laptop',
+        label: 'Laptop',
+        sub: 'Wireless client',
+        icon: 'laptop',
+        pos: [4, -1.6],
+        size: [1.7, 0.12, 1.2],
+        ports: [{ id: 'laptop-nic', label: 'Wi-Fi radio', kind: 'nic', face: 'back', u: 0.5, v: 0.6 }],
+      },
+      {
+        id: 'phone',
+        label: 'IP Phone',
+        sub: 'Wireless client',
+        icon: 'phone',
+        pos: [4, 2.2],
+        size: [0.7, 1.1, 0.5],
+        ports: [{ id: 'phone-nic', label: 'Wi-Fi radio', kind: 'nic', face: 'left', u: 0.5, v: 0.6 }],
+      },
+    ],
+    steps: [
+      {
+        id: 's1',
+        title: 'Power the switch',
+        instruction: "Run the power cable from the switch's power in to Socket A.",
+        why: 'The switch is the wired core - the access point and the desktop both hang off it, so it comes up first.',
+        type: 'connect',
+        from: 'switch-power',
+        to: 'outlet-socket-a',
+        cable: 'power',
+      },
+      {
+        id: 's2',
+        title: 'Power on the switch',
+        instruction: "Press the switch's power button.",
+        why: 'The uplink to the router is already patched. Once the switch boots, the wired side of the office is live.',
+        type: 'power',
+        target: 'switch',
+      },
+      {
+        id: 's3',
+        title: 'Power the access point',
+        instruction: "Run the power cable from the access point's power in to Socket B.",
+        why: 'An access point is an active radio - it needs mains power (or Power-over-Ethernet) before it can broadcast an SSID.',
+        type: 'connect',
+        from: 'ap-power',
+        to: 'outlet-socket-b',
+        cable: 'power',
+      },
+      {
+        id: 's4',
+        title: 'Power on the access point',
+        instruction: "Press the access point's power button.",
+        why: 'On boot it starts beaconing its network name (SSID) so nearby clients can find and join it.',
+        type: 'power',
+        target: 'ap',
+      },
+      {
+        id: 's5',
+        title: 'Cable the access point to the switch',
+        instruction: "Run an Ethernet cable from the access point's LAN uplink to Port 2 on the switch.",
+        why: 'This is the part people forget: Wi-Fi only replaces the cable to the client. The AP itself still needs a wire back to the switch to reach the rest of the network.',
+        type: 'connect',
+        from: 'ap-uplink',
+        to: 'switch-p2',
+        cable: 'data',
+      },
+      {
+        id: 's6',
+        title: 'Wire the desktop',
+        instruction: "Run an Ethernet cable from the desktop's NIC to Port 1 on the switch.",
+        why: 'A fixed workstation is better off wired - lower latency, no contention for the airtime. Wired and wireless clients share the same LAN.',
+        type: 'connect',
+        from: 'desktop-nic',
+        to: 'switch-p1',
+        cable: 'data',
+      },
+      {
+        id: 's7',
+        title: 'Join the laptop to Wi-Fi',
+        instruction: "Connect the laptop's Wi-Fi radio to the access point's Wi-Fi (SSID) port.",
+        why: 'This stands in for selecting the SSID and associating. There is no cable - the link is radio - but the AP bridges the laptop straight onto the wired LAN.',
+        type: 'connect',
+        from: 'laptop-nic',
+        to: 'ap-radio',
+        cable: 'data',
+      },
+      {
+        id: 's8',
+        title: 'Join the phone to Wi-Fi',
+        instruction: "Connect the IP phone's Wi-Fi radio to the access point's Wi-Fi (SSID) port.",
+        why: 'The same AP serves many clients at once. The phone associates just like the laptop and lands on the same network.',
+        type: 'connect',
+        from: 'phone-nic',
+        to: 'ap-radio',
+        cable: 'data',
+      },
+    ],
+  },
+
+  // ── LAB 5 ────────────────────────────────────────────────────────────────
+  {
+    id: 'network-expansion',
+    title: 'Network Expansion',
+    subtitle: 'Requirement: add a 3-PC department',
+    blurb: 'A router, a switch and two PCs are already working. New brief: a second department needs three more computers online. Decide what hardware it takes and cable it in.',
+    outro: 'When a switch runs out of ports, you add another switch and give it its own uplink to the router. Each switch is one more branch off the same tree.',
+    level: 5,
+    initialPowered: ['switch1'],
+    initialCables: [
+      { from: 'switch1-power', to: 'outlet-socket-a', cable: 'power' },
+      { from: 'switch1-uplink', to: 'router-lan1', cable: 'data' },
+      { from: 'pc1-nic', to: 'switch1-p1', cable: 'data' },
+      { from: 'pc2-nic', to: 'switch1-p2', cable: 'data' },
+    ],
+    nodes: [
+      {
+        id: 'outlet',
+        label: 'Wall Outlet',
+        sub: 'Mains power',
+        icon: 'outlet',
+        pos: [-5.4, 0.4],
+        size: [0.4, 1.3, 0.95],
+        ports: [
+          { id: 'outlet-socket-a', label: 'Socket A', kind: 'power', face: 'right', u: 0.32, v: 0.5 },
+          { id: 'outlet-socket-b', label: 'Socket B', kind: 'power', face: 'right', u: 0.7, v: 0.5 },
+        ],
+      },
+      {
+        id: 'router',
+        label: 'Office Router',
+        sub: 'Internet gateway',
+        icon: 'router',
+        pos: [-2, -3],
+        size: [2.2, 0.5, 1.2],
+        ports: [
+          { id: 'router-lan1', label: 'LAN 1', kind: 'lan', face: 'front', u: 0.35, v: 0.5 },
+          { id: 'router-lan2', label: 'LAN 2', kind: 'lan', face: 'front', u: 0.65, v: 0.5 },
+        ],
+      },
+      {
+        id: 'switch1',
+        label: 'Switch A',
+        sub: 'Department 1',
+        icon: 'switch',
+        pos: [-2.6, -0.4],
+        size: [2.6, 0.4, 1.3],
+        needsPower: true,
+        ports: [
+          { id: 'switch1-power', label: 'Power in', kind: 'power', face: 'front', u: 0.18, v: 0.4 },
+          { id: 'switch1-uplink', label: 'Uplink', kind: 'uplink', face: 'top', u: 0.5, v: 0.2 },
+          { id: 'switch1-p1', label: 'Port 1', kind: 'lan', face: 'left', u: 0.4, v: 0.4 },
+          { id: 'switch1-p2', label: 'Port 2', kind: 'lan', face: 'left', u: 0.65, v: 0.4 },
+        ],
+      },
+      {
+        id: 'switch2',
+        label: 'Switch B',
+        sub: 'Department 2 (new)',
+        icon: 'switch',
+        pos: [2.4, -0.4],
+        size: [2.8, 0.4, 1.3],
+        needsPower: true,
+        ports: [
+          { id: 'switch2-power', label: 'Power in', kind: 'power', face: 'front', u: 0.15, v: 0.4 },
+          { id: 'switch2-uplink', label: 'Uplink', kind: 'uplink', face: 'top', u: 0.5, v: 0.2 },
+          { id: 'switch2-p1', label: 'Port 1', kind: 'lan', face: 'front', u: 0.45, v: 0.45 },
+          { id: 'switch2-p2', label: 'Port 2', kind: 'lan', face: 'right', u: 0.5, v: 0.4 },
+          { id: 'switch2-p3', label: 'Port 3', kind: 'lan', face: 'back', u: 0.5, v: 0.45 },
+        ],
+      },
+      {
+        id: 'pc1',
+        label: 'PC-1',
+        sub: 'Department 1',
+        icon: 'desktop',
+        pos: [-4.4, -2.4],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'pc1-nic', label: 'Ethernet', kind: 'nic', face: 'right', u: 0.5, v: 0.45 }],
+      },
+      {
+        id: 'pc2',
+        label: 'PC-2',
+        sub: 'Department 1',
+        icon: 'pc',
+        pos: [-4.4, -0.6],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'pc2-nic', label: 'Ethernet', kind: 'nic', face: 'right', u: 0.5, v: 0.45 }],
+      },
+      {
+        id: 'pc3',
+        label: 'PC-3',
+        sub: 'Department 2',
+        icon: 'pc',
+        pos: [2.4, 2.4],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'pc3-nic', label: 'Ethernet', kind: 'nic', face: 'back', u: 0.5, v: 0.45 }],
+      },
+      {
+        id: 'pc4',
+        label: 'PC-4',
+        sub: 'Department 2',
+        icon: 'pc',
+        pos: [4.4, 1.6],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'pc4-nic', label: 'Ethernet', kind: 'nic', face: 'left', u: 0.5, v: 0.45 }],
+      },
+      {
+        id: 'pc5',
+        label: 'PC-5',
+        sub: 'Department 2',
+        icon: 'pc',
+        pos: [4.4, -0.4],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'pc5-nic', label: 'Ethernet', kind: 'nic', face: 'left', u: 0.5, v: 0.45 }],
+      },
+    ],
+    steps: [
+      {
+        id: 's1',
+        title: 'Power the new switch',
+        instruction: "The new department needs its own switch. Run the power cable from Switch B's power in to Socket B.",
+        why: 'Two PCs already fill Switch A. Three more computers need more ports than it has, so a second switch is the right piece of hardware to add.',
+        type: 'connect',
+        from: 'switch2-power',
+        to: 'outlet-socket-b',
+        cable: 'power',
+      },
+      {
+        id: 's2',
+        title: 'Power on Switch B',
+        instruction: "Press Switch B's power button.",
+        why: 'Same as any switch: it needs to boot before it can learn MAC addresses and forward frames.',
+        type: 'power',
+        target: 'switch2',
+      },
+      {
+        id: 's3',
+        title: 'Uplink Switch B to the router',
+        instruction: "Run an Ethernet cable from Switch B's uplink to LAN 2 on the router - a different port from Switch A's uplink.",
+        why: 'Each switch needs its own path to the router. Both departments now reach the gateway, and the router keeps their traffic sorted.',
+        type: 'connect',
+        from: 'switch2-uplink',
+        to: 'router-lan2',
+        cable: 'data',
+      },
+      {
+        id: 's4',
+        title: 'Connect PC-3',
+        instruction: "Run an Ethernet cable from PC-3's NIC to Port 1 on Switch B.",
+        why: 'The first machine of the new department joins the network.',
+        type: 'connect',
+        from: 'pc3-nic',
+        to: 'switch2-p1',
+        cable: 'data',
+      },
+      {
+        id: 's5',
+        title: 'Connect PC-4',
+        instruction: "Run an Ethernet cable from PC-4's NIC to Port 2 on Switch B.",
+        why: 'Two down, one to go. Every device on Switch B shares its single uplink to the router.',
+        type: 'connect',
+        from: 'pc4-nic',
+        to: 'switch2-p2',
+        cable: 'data',
+      },
+      {
+        id: 's6',
+        title: 'Connect PC-5',
+        instruction: "Run an Ethernet cable from PC-5's NIC to Port 3 on Switch B.",
+        why: 'The three-computer department is online. You sized the hardware to the requirement and cabled it to the existing network.',
+        type: 'connect',
+        from: 'pc5-nic',
+        to: 'switch2-p3',
+        cable: 'data',
+      },
+    ],
+  },
+
+  // ── LAB 6 ────────────────────────────────────────────────────────────────
+  {
+    id: 'hardware-troubleshooting',
+    title: 'Hardware Troubleshooting',
+    subtitle: 'Find and fix a broken network',
+    blurb: 'This network was cabled by someone in a hurry. Nothing on the office LAN can reach the internet. Inspect the hardware, work out what is wrong, and put it right.',
+    outro: 'Two swapped cables and a switch nobody powered on. Physical-layer faults are almost always this: wrong port, wrong cable, or no power. Check those first, every time.',
+    level: 6,
+    symptom: 'PC-1 and PC-2 have no internet. The switch link lights are dark, and the router\'s WAN light is off.',
+    initialCables: [
+      { from: 'switch-uplink', to: 'router-wan', cable: 'data' },
+      { from: 'modem-eth', to: 'router-lan1', cable: 'data' },
+      { from: 'switch-power', to: 'outlet-socket-a', cable: 'power' },
+      { from: 'pc1-nic', to: 'switch-p1', cable: 'data' },
+      { from: 'pc2-nic', to: 'switch-p2', cable: 'data' },
+    ],
+    nodes: [
+      {
+        id: 'outlet',
+        label: 'Wall Outlet',
+        sub: 'Mains power',
+        icon: 'outlet',
+        pos: [-5.2, 0.4],
+        size: [0.4, 1.3, 0.95],
+        ports: [
+          { id: 'outlet-socket-a', label: 'Socket A', kind: 'power', face: 'right', u: 0.5, v: 0.5 },
+        ],
+      },
+      {
+        id: 'modem',
+        label: 'ISP Modem',
+        sub: 'Internet feed',
+        icon: 'modem',
+        pos: [-2, -3.4],
+        size: [2, 0.45, 1.1],
+        ports: [{ id: 'modem-eth', label: 'Ethernet out', kind: 'wan', face: 'front', u: 0.5, v: 0.5 }],
+      },
+      {
+        id: 'router',
+        label: 'Office Router',
+        sub: 'Internet gateway',
+        icon: 'router',
+        pos: [-2, -1.3],
+        size: [2.4, 0.5, 1.4],
+        ports: [
+          { id: 'router-wan', label: 'WAN', kind: 'wan', face: 'top', u: 0.35, v: 0.2 },
+          { id: 'router-lan1', label: 'LAN 1', kind: 'lan', face: 'top', u: 0.65, v: 0.2 },
+        ],
+      },
+      {
+        id: 'switch',
+        label: '8-Port Switch',
+        sub: 'Office LAN',
+        icon: 'switch',
+        pos: [-2, 1.2],
+        size: [2.8, 0.4, 1.4],
+        needsPower: true,
+        ports: [
+          { id: 'switch-power', label: 'Power in', kind: 'power', face: 'front', u: 0.16, v: 0.4 },
+          { id: 'switch-uplink', label: 'Uplink', kind: 'uplink', face: 'top', u: 0.5, v: 0.2 },
+          { id: 'switch-p1', label: 'Port 1', kind: 'lan', face: 'right', u: 0.4, v: 0.4 },
+          { id: 'switch-p2', label: 'Port 2', kind: 'lan', face: 'right', u: 0.7, v: 0.4 },
+        ],
+      },
+      {
+        id: 'pc1',
+        label: 'PC-1',
+        sub: 'Workstation',
+        icon: 'desktop',
+        pos: [2.4, -0.4],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'pc1-nic', label: 'Ethernet', kind: 'nic', face: 'left', u: 0.5, v: 0.45 }],
+      },
+      {
+        id: 'pc2',
+        label: 'PC-2',
+        sub: 'Workstation',
+        icon: 'pc',
+        pos: [2.4, 1.8],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'pc2-nic', label: 'Ethernet', kind: 'nic', face: 'left', u: 0.5, v: 0.45 }],
+      },
+    ],
+    steps: [
+      {
+        id: 's1',
+        title: 'Inspect the switch uplink',
+        instruction: "The switch uplink is plugged into the router's WAN port. That port faces the ISP, not the LAN. Unplug that cable.",
+        why: 'The WAN port is a separate routed interface for the internet feed. A switch full of office PCs must land on a LAN port, or the router will not bridge it onto the local network.',
+        type: 'fix-remove',
+        from: 'switch-uplink',
+        to: 'router-wan',
+      },
+      {
+        id: 's2',
+        title: 'Inspect the internet feed',
+        instruction: "The modem is plugged into the router's LAN 1 port. Unplug that cable too.",
+        why: 'The two cables were swapped. The modem carries the ISP connection and belongs on WAN; a LAN port will not route it to the internet.',
+        type: 'fix-remove',
+        from: 'modem-eth',
+        to: 'router-lan1',
+      },
+      {
+        id: 's3',
+        title: 'Reconnect the modem to WAN',
+        instruction: "Run the modem's Ethernet cable to the router's WAN port.",
+        why: 'WAN is the one interface built to face the ISP - it gets the public address and the default route.',
+        type: 'connect',
+        from: 'modem-eth',
+        to: 'router-wan',
+        cable: 'data',
+      },
+      {
+        id: 's4',
+        title: 'Reconnect the switch to LAN',
+        instruction: "Run the switch uplink to the router's LAN 1 port.",
+        why: 'Now the office LAN sits on a LAN interface, in the same subnet the router hands out addresses on.',
+        type: 'connect',
+        from: 'switch-uplink',
+        to: 'router-lan1',
+        cable: 'data',
+      },
+      {
+        id: 's5',
+        title: 'Power on the switch',
+        instruction: "The switch power cable is plugged in, but the switch is off. Press its power button.",
+        why: 'Cabling can be perfect and the link still be dead if the device has no power. Always confirm the LEDs are on before chasing anything more complex.',
+        type: 'power',
+        target: 'switch',
       },
     ],
   },
