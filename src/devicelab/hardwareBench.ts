@@ -89,6 +89,73 @@ export interface Bench {
   initialPowered?: string[]
   nodes: BenchNode[]
   steps: BenchStep[]
+  /**
+   * Free-build mode. When set, there is no ordered step list - the learner
+   * cables and powers devices in any order and a checklist is verified on
+   * demand. `steps` should be [] for these benches.
+   */
+  goal?: BenchGoal
+}
+
+export type GoalCheck =
+  | { kind: 'powered'; node: string; label: string }
+  | { kind: 'cabled'; from: string; to: string; label: string }
+  /** `node` has at least one cable whose FAR end is a port of one of `toKinds`. */
+  | { kind: 'uplink'; node: string; toKinds: PortKind[]; label: string }
+  /** every node whose icon is in `icons` satisfies an `uplink` to `toKinds`. */
+  | { kind: 'all-uplink'; icons: NodeIcon[]; toKinds: PortKind[]; label: string }
+
+export interface BenchGoal {
+  brief: string
+  checklist: GoalCheck[]
+}
+
+/** Evaluate a free-build bench's checklist against the current cable + power state. */
+export function evalGoal(
+  bench: Bench,
+  cables: { from: string; to: string }[],
+  powered: Set<string>,
+): { label: string; ok: boolean }[] {
+  const portToNode = new Map<string, BenchNode>()
+  const portKind = new Map<string, PortKind>()
+  for (const n of bench.nodes) {
+    for (const p of n.ports) {
+      portToNode.set(p.id, n)
+      portKind.set(p.id, p.kind)
+    }
+  }
+  const isPowered = (nodeId: string) => {
+    const n = bench.nodes.find((x) => x.id === nodeId)
+    return !n?.needsPower || powered.has(nodeId)
+  }
+  const pairCabled = (a: string, b: string) =>
+    cables.some((c) => (c.from === a && c.to === b) || (c.from === b && c.to === a))
+  const nodeUplinks = (nodeId: string, toKinds: PortKind[]) =>
+    cables.some((c) => {
+      const fromNode = portToNode.get(c.from)?.id
+      const toNode = portToNode.get(c.to)?.id
+      if (fromNode === nodeId && toKinds.includes(portKind.get(c.to) ?? ('' as PortKind))) return true
+      if (toNode === nodeId && toKinds.includes(portKind.get(c.from) ?? ('' as PortKind))) return true
+      return false
+    })
+
+  return bench.goal!.checklist.map((chk) => {
+    switch (chk.kind) {
+      case 'powered':
+        return { label: chk.label, ok: isPowered(chk.node) }
+      case 'cabled':
+        return { label: chk.label, ok: pairCabled(chk.from, chk.to) }
+      case 'uplink':
+        return { label: chk.label, ok: nodeUplinks(chk.node, chk.toKinds) }
+      case 'all-uplink': {
+        const targets = bench.nodes.filter((n) => chk.icons.includes(n.icon))
+        return {
+          label: chk.label,
+          ok: targets.length > 0 && targets.every((n) => nodeUplinks(n.id, chk.toKinds)),
+        }
+      }
+    }
+  })
 }
 
 export const BENCHES: Bench[] = [
@@ -926,6 +993,235 @@ export const BENCHES: Bench[] = [
         why: 'Cabling can be perfect and the link still be dead if the device has no power. Always confirm the LEDs are on before chasing anything more complex.',
         type: 'power',
         target: 'switch',
+      },
+    ],
+  },
+
+  // ── LAB 7 ────────────────────────────────────────────────────────────────
+  {
+    id: 'small-business',
+    title: 'Build a Small Business Network',
+    subtitle: 'From an empty board · no step list',
+    blurb: 'You are setting up networking for a small business: internet, a router, a switch, Wi-Fi, three computers and a shared printer. Cable and power it in whatever order you like - then check your work against the requirements.',
+    outro: 'That is a complete small-office network: one internet feed to the router\'s WAN, one switch fanning out the LAN, an access point wired back to that switch, and every device on a port. Order did not matter - the finished topology did.',
+    level: 7,
+    steps: [],
+    goal: {
+      brief: 'Required: internet on the router\'s WAN, a switch uplinked to the router, an access point cabled to the switch, and every computer and the printer on a switch port. All active devices powered on.',
+      checklist: [
+        { kind: 'powered', node: 'router', label: 'Router powered on' },
+        { kind: 'powered', node: 'switch', label: 'Switch powered on' },
+        { kind: 'powered', node: 'ap', label: 'Access point powered on' },
+        { kind: 'uplink', node: 'router', toKinds: ['wan'], label: 'Internet feed on the router WAN port' },
+        { kind: 'uplink', node: 'switch', toKinds: ['lan'], label: 'Switch uplinked to a router LAN port' },
+        { kind: 'uplink', node: 'ap', toKinds: ['lan'], label: 'Access point cabled back to the switch' },
+        { kind: 'all-uplink', icons: ['desktop', 'pc', 'printer'], toKinds: ['lan'], label: 'Every computer and the printer on a switch port' },
+      ],
+    },
+    nodes: [
+      {
+        id: 'outlet',
+        label: 'Wall Outlet',
+        sub: 'Mains power',
+        icon: 'outlet',
+        pos: [-5.6, 0.2],
+        size: [0.4, 1.5, 1.1],
+        ports: [
+          { id: 'outlet-a', label: 'Socket A', kind: 'power', face: 'right', u: 0.25, v: 0.5 },
+          { id: 'outlet-b', label: 'Socket B', kind: 'power', face: 'right', u: 0.5, v: 0.5 },
+          { id: 'outlet-c', label: 'Socket C', kind: 'power', face: 'right', u: 0.75, v: 0.5 },
+        ],
+      },
+      {
+        id: 'modem',
+        label: 'ISP Modem',
+        sub: 'Internet feed',
+        icon: 'modem',
+        pos: [-2.6, -3.6],
+        size: [2, 0.45, 1.1],
+        ports: [{ id: 'modem-eth', label: 'Ethernet out', kind: 'wan', face: 'front', u: 0.5, v: 0.5 }],
+      },
+      {
+        id: 'router',
+        label: 'Business Router',
+        sub: 'Gateway',
+        icon: 'router',
+        pos: [-2.6, -1.6],
+        size: [2.2, 0.5, 1.4],
+        needsPower: true,
+        ports: [
+          { id: 'router-power', label: 'DC power in', kind: 'power', face: 'front', u: 0.2, v: 0.4 },
+          { id: 'router-wan', label: 'WAN', kind: 'wan', face: 'top', u: 0.5, v: 0.2 },
+          { id: 'router-lan1', label: 'LAN 1', kind: 'lan', face: 'right', u: 0.4, v: 0.4 },
+          { id: 'router-lan2', label: 'LAN 2', kind: 'lan', face: 'right', u: 0.7, v: 0.4 },
+        ],
+      },
+      {
+        id: 'switch',
+        label: '8-Port Switch',
+        sub: 'LAN core',
+        icon: 'switch',
+        pos: [-2.6, 0.9],
+        size: [3, 0.4, 1.4],
+        needsPower: true,
+        ports: [
+          { id: 'switch-power', label: 'Power in', kind: 'power', face: 'front', u: 0.14, v: 0.4 },
+          { id: 'switch-uplink', label: 'Uplink', kind: 'uplink', face: 'top', u: 0.5, v: 0.2 },
+          { id: 'switch-p1', label: 'Port 1', kind: 'lan', face: 'front', u: 0.42, v: 0.45 },
+          { id: 'switch-p2', label: 'Port 2', kind: 'lan', face: 'front', u: 0.58, v: 0.45 },
+          { id: 'switch-p3', label: 'Port 3', kind: 'lan', face: 'right', u: 0.5, v: 0.4 },
+          { id: 'switch-p4', label: 'Port 4', kind: 'lan', face: 'back', u: 0.5, v: 0.45 },
+        ],
+      },
+      {
+        id: 'ap',
+        label: 'Access Point',
+        sub: 'Wi-Fi',
+        icon: 'accesspoint',
+        pos: [1.6, 0.9],
+        size: [1.3, 0.35, 1.3],
+        needsPower: true,
+        ports: [
+          { id: 'ap-power', label: 'Power in', kind: 'power', face: 'front', u: 0.25, v: 0.5 },
+          { id: 'ap-uplink', label: 'LAN uplink', kind: 'uplink', face: 'back', u: 0.5, v: 0.5 },
+        ],
+      },
+      {
+        id: 'pc1',
+        label: 'PC-1',
+        sub: 'Workstation',
+        icon: 'desktop',
+        pos: [3.6, -2.2],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'pc1-nic', label: 'Ethernet', kind: 'nic', face: 'left', u: 0.5, v: 0.45 }],
+      },
+      {
+        id: 'pc2',
+        label: 'PC-2',
+        sub: 'Workstation',
+        icon: 'pc',
+        pos: [3.6, -0.4],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'pc2-nic', label: 'Ethernet', kind: 'nic', face: 'left', u: 0.5, v: 0.45 }],
+      },
+      {
+        id: 'pc3',
+        label: 'PC-3',
+        sub: 'Workstation',
+        icon: 'pc',
+        pos: [3.6, 1.4],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'pc3-nic', label: 'Ethernet', kind: 'nic', face: 'left', u: 0.5, v: 0.45 }],
+      },
+      {
+        id: 'printer',
+        label: 'Printer',
+        sub: 'Shared',
+        icon: 'printer',
+        pos: [-2.6, 3.2],
+        size: [1.4, 0.9, 1.1],
+        ports: [{ id: 'printer-nic', label: 'Ethernet', kind: 'nic', face: 'front', u: 0.7, v: 0.5 }],
+      },
+    ],
+  },
+
+  // ── LAB 8 ────────────────────────────────────────────────────────────────
+  {
+    id: 'hardware-challenge',
+    title: 'Hardware Challenge',
+    subtitle: 'A goal, no instructions',
+    blurb: 'Build a network where all three computers can talk to each other and reach the Internet. You decide which cables go where. Nothing is guided - meet the goals.',
+    outro: 'You worked out the topology yourself: modem to the router\'s WAN, switch to a router LAN port, and all three computers on the switch. That is the shape of nearly every network you will ever build.',
+    level: 8,
+    steps: [],
+    goal: {
+      brief: 'Goal: all three computers can communicate with each other AND reach the Internet.',
+      checklist: [
+        { kind: 'uplink', node: 'router', toKinds: ['wan'], label: 'The network can reach the Internet (modem on the router WAN)' },
+        { kind: 'uplink', node: 'switch', toKinds: ['lan'], label: 'The switch reaches the router' },
+        { kind: 'all-uplink', icons: ['pc', 'desktop'], toKinds: ['lan'], label: 'All three computers are connected to the network' },
+        { kind: 'powered', node: 'router', label: 'The router is powered on' },
+        { kind: 'powered', node: 'switch', label: 'The switch is powered on' },
+      ],
+    },
+    nodes: [
+      {
+        id: 'outlet',
+        label: 'Wall Outlet',
+        sub: 'Mains power',
+        icon: 'outlet',
+        pos: [-5.2, 0.4],
+        size: [0.4, 1.3, 0.95],
+        ports: [
+          { id: 'outlet-a', label: 'Socket A', kind: 'power', face: 'right', u: 0.32, v: 0.5 },
+          { id: 'outlet-b', label: 'Socket B', kind: 'power', face: 'right', u: 0.7, v: 0.5 },
+        ],
+      },
+      {
+        id: 'modem',
+        label: 'ISP Modem',
+        sub: 'Internet feed',
+        icon: 'modem',
+        pos: [-2, -3.4],
+        size: [2, 0.45, 1.1],
+        ports: [{ id: 'modem-eth', label: 'Ethernet out', kind: 'wan', face: 'front', u: 0.5, v: 0.5 }],
+      },
+      {
+        id: 'router',
+        label: 'Router',
+        sub: 'Gateway',
+        icon: 'router',
+        pos: [-2, -1.3],
+        size: [2.2, 0.5, 1.4],
+        needsPower: true,
+        ports: [
+          { id: 'router-power', label: 'DC power in', kind: 'power', face: 'front', u: 0.2, v: 0.4 },
+          { id: 'router-wan', label: 'WAN', kind: 'wan', face: 'top', u: 0.5, v: 0.2 },
+          { id: 'router-lan1', label: 'LAN 1', kind: 'lan', face: 'right', u: 0.6, v: 0.4 },
+        ],
+      },
+      {
+        id: 'switch',
+        label: 'Switch',
+        sub: 'LAN',
+        icon: 'switch',
+        pos: [-2, 1.2],
+        size: [2.8, 0.4, 1.4],
+        needsPower: true,
+        ports: [
+          { id: 'switch-power', label: 'Power in', kind: 'power', face: 'front', u: 0.16, v: 0.4 },
+          { id: 'switch-uplink', label: 'Uplink', kind: 'uplink', face: 'top', u: 0.5, v: 0.2 },
+          { id: 'switch-p1', label: 'Port 1', kind: 'lan', face: 'right', u: 0.4, v: 0.4 },
+          { id: 'switch-p2', label: 'Port 2', kind: 'lan', face: 'front', u: 0.6, v: 0.45 },
+          { id: 'switch-p3', label: 'Port 3', kind: 'lan', face: 'back', u: 0.5, v: 0.45 },
+        ],
+      },
+      {
+        id: 'pc1',
+        label: 'PC-1',
+        sub: 'Workstation',
+        icon: 'desktop',
+        pos: [2.4, -1],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'pc1-nic', label: 'Ethernet', kind: 'nic', face: 'left', u: 0.5, v: 0.45 }],
+      },
+      {
+        id: 'pc2',
+        label: 'PC-2',
+        sub: 'Workstation',
+        icon: 'pc',
+        pos: [2.4, 0.8],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'pc2-nic', label: 'Ethernet', kind: 'nic', face: 'left', u: 0.5, v: 0.45 }],
+      },
+      {
+        id: 'pc3',
+        label: 'PC-3',
+        sub: 'Workstation',
+        icon: 'pc',
+        pos: [2.4, 2.6],
+        size: [0.9, 1.5, 1.2],
+        ports: [{ id: 'pc3-nic', label: 'Ethernet', kind: 'nic', face: 'left', u: 0.5, v: 0.45 }],
       },
     ],
   },

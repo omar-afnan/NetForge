@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { CableKind, DeviceType } from '@/network/types'
 
-type View = 'dashboard' | 'learn' | 'devicelab' | 'topology' | 'traffic' | 'issues' | 'agents' | 'reports' | 'labs' | 'settings' | 'terminal'
+type View = 'learn' | 'devicelab' | 'topology' | 'traffic' | 'issues' | 'agents' | 'reports' | 'labs' | 'settings' | 'terminal'
 
 export type TopologyTool = 'select' | 'wire' | 'delete' | 'place'
 
@@ -33,7 +33,7 @@ interface UIState {
 }
 
 export const useUIStore = create<UIState>((set) => ({
-  activeView: 'topology',
+  activeView: 'learn',
   sidebarCollapsed: false,
   deviceLabLessonOpen: false,
   deviceLabCopilotRequested: false,

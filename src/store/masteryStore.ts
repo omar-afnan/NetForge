@@ -19,6 +19,14 @@ export type ConceptId =
   | 'tcp'
   | 'udp'
   | 'ports'
+  | 'dhcp'
+  | 'dns'
+  | 'nat'
+  | 'icmp'
+  | 'mac'
+  | 'arp'
+  | 'switching'
+  | 'encapsulation'
 
 export const CONCEPT_LABELS: Record<ConceptId, string> = {
   'ipv4-addressing': 'IPv4 addressing',
@@ -30,6 +38,14 @@ export const CONCEPT_LABELS: Record<ConceptId, string> = {
   tcp: 'TCP',
   udp: 'UDP',
   ports: 'Ports & sockets',
+  dhcp: 'DHCP',
+  dns: 'DNS',
+  nat: 'NAT',
+  icmp: 'ICMP / ping',
+  mac: 'MAC & Ethernet',
+  arp: 'ARP',
+  switching: 'Switching',
+  encapsulation: 'Encapsulation',
 }
 
 export const CONCEPT_ORDER: ConceptId[] = [
@@ -42,6 +58,14 @@ export const CONCEPT_ORDER: ConceptId[] = [
   'tcp',
   'udp',
   'ports',
+  'dhcp',
+  'dns',
+  'nat',
+  'icmp',
+  'mac',
+  'arp',
+  'switching',
+  'encapsulation',
 ]
 
 type Scores = Record<ConceptId, number>
@@ -56,6 +80,14 @@ const EMPTY: Scores = {
   tcp: 0,
   udp: 0,
   ports: 0,
+  dhcp: 0,
+  dns: 0,
+  nat: 0,
+  icmp: 0,
+  mac: 0,
+  arp: 0,
+  switching: 0,
+  encapsulation: 0,
 }
 
 interface MasteryState {

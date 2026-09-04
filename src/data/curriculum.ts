@@ -73,6 +73,7 @@ export const CURRICULUM: CurriculumModule[] = [
     title: 'Networking Fundamentals',
     blurb: 'What a network actually is, the devices that build one, and how data finds its way from A to B.',
     relatedLabIds: ['starter'],
+    interactiveLessonIds: ['packet-journey'],
     lessons: [
       {
         id: 'what-is-a-network',
@@ -138,6 +139,7 @@ export const CURRICULUM: CurriculumModule[] = [
     title: 'Ethernet & Switching',
     blurb: 'MAC addresses, how a switch learns and forwards, and what happens when it does not know where to send a frame.',
     relatedLabIds: ['mac-address-lab', 'switch-learning-lab'],
+    interactiveLessonIds: ['mac'],
     lessons: [
       {
         id: 'mac-addresses',
@@ -264,7 +266,7 @@ export const CURRICULUM: CurriculumModule[] = [
     title: 'Subnetting',
     blurb: 'Splitting one network into many: prefix lengths, borrowing bits, and calculating ranges fast.',
     relatedLabIds: ['subnetting-lab'],
-    interactiveLessonIds: ['ipv4-cidr', 'subnetting-practice'],
+    interactiveLessonIds: ['ipv4-cidr', 'subnetting-practice', 'vlsm'],
     lessons: [
       {
         id: 'prefix-lengths',
@@ -315,6 +317,7 @@ export const CURRICULUM: CurriculumModule[] = [
     title: 'ARP - Address Resolution Protocol',
     blurb: 'How IP addresses get matched to MAC addresses - broadcast question, unicast answer.',
     relatedLabIds: ['arp-lab'],
+    interactiveLessonIds: ['arp'],
     lessons: [
       {
         id: 'how-arp-works',
@@ -362,6 +365,7 @@ export const CURRICULUM: CurriculumModule[] = [
     title: 'Switching & VLANs',
     blurb: 'MAC tables, flooding, access ports, VLAN segmentation and trunks.',
     relatedLabIds: ['vlan-lab', 'trunk-lab'],
+    interactiveLessonIds: ['switching'],
     lessons: [
       {
         id: 'mac-table-deep-dive',
@@ -426,6 +430,7 @@ export const CURRICULUM: CurriculumModule[] = [
     title: 'Routing',
     blurb: 'Routing tables, static routes, next hops, and how routers decide where packets go.',
     relatedLabIds: ['missing-route', 'static-route-lab'],
+    interactiveLessonIds: ['routing'],
     lessons: [
       {
         id: 'routing-basics',
@@ -492,7 +497,7 @@ export const CURRICULUM: CurriculumModule[] = [
     title: 'TCP / UDP',
     blurb: 'Ports, sockets, reliability and the three-way handshake.',
     relatedLabIds: ['tcp-handshake-lab'],
-    interactiveLessonIds: ['tcp', 'udp', 'tcp-udp-choose'],
+    interactiveLessonIds: ['tcp', 'udp', 'tcp-udp-choose', 'ports'],
     lessons: [
       {
         id: 'ports-and-sockets',
@@ -558,6 +563,7 @@ export const CURRICULUM: CurriculumModule[] = [
     title: 'DHCP & DNS',
     blurb: 'Automatic addressing (DORA) and name resolution.',
     relatedLabIds: ['dhcp-lab', 'dns-lab'],
+    interactiveLessonIds: ['dhcp', 'dns'],
     lessons: [
       {
         id: 'dhcp-dora',
@@ -609,6 +615,7 @@ export const CURRICULUM: CurriculumModule[] = [
     title: 'NAT & PAT',
     blurb: 'How private addresses reach the Internet: translation, inside/outside, and PAT.',
     relatedLabIds: ['nat-lab', 'wrong-gateway'],
+    interactiveLessonIds: ['nat'],
     lessons: [
       {
         id: 'why-nat',
@@ -808,6 +815,7 @@ export const CURRICULUM: CurriculumModule[] = [
     title: 'Full Troubleshooting',
     blurb: 'A repeatable methodology, layered diagnosis, and the final boss lab.',
     relatedLabIds: ['final-boss'],
+    interactiveLessonIds: ['icmp'],
     lessons: [
       {
         id: 'methodology',

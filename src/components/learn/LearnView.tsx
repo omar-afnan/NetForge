@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { BookOpen, CheckCircle2, Circle, FlaskConical, GraduationCap, Lock, Monitor } from 'lucide-react'
+import { ArrowRight, BookOpen, CheckCircle2, Circle, FlaskConical, GraduationCap, Lock, Monitor, Sparkles } from 'lucide-react'
 import { EXPLAINERS } from '@/components/learn/Explainers'
 import { CURRICULUM, type CurriculumModule, type Lesson } from '@/data/curriculum'
 import { useLearnProgress } from '@/store/progressStore'
@@ -10,6 +10,9 @@ import { IPV4_CIDR_LESSON } from '@/data/lessons/ipv4-cidr'
 import type { InteractiveLesson } from '@/data/lessons/types'
 import { SUBNETTING_PRACTICE_LESSON } from '@/data/lessons/subnetting-practice'
 import { TCP_LESSON, UDP_LESSON, TCP_VS_UDP_LESSON } from '@/data/lessons/transport'
+import { DHCP_LESSON, DNS_LESSON, NAT_LESSON, ICMP_LESSON } from '@/data/lessons/services'
+import { MAC_LESSON, SWITCHING_LESSON, ARP_LESSON, ROUTING_LESSON } from '@/data/lessons/l2'
+import { VLSM_LESSON, PORTS_LESSON, PACKET_JOURNEY_LESSON } from '@/data/lessons/advanced'
 import { LabIntro } from '@/components/learn/LabIntro'
 import { InteractiveLessonRunner } from '@/components/learn/InteractiveLessonRunner'
 import { ConceptMasteryPanel } from '@/components/learn/ConceptMasteryPanel'
@@ -21,6 +24,17 @@ const INTERACTIVE_LESSONS: Record<string, InteractiveLesson> = {
   tcp: TCP_LESSON,
   udp: UDP_LESSON,
   'tcp-udp-choose': TCP_VS_UDP_LESSON,
+  dhcp: DHCP_LESSON,
+  dns: DNS_LESSON,
+  nat: NAT_LESSON,
+  icmp: ICMP_LESSON,
+  mac: MAC_LESSON,
+  switching: SWITCHING_LESSON,
+  arp: ARP_LESSON,
+  routing: ROUTING_LESSON,
+  vlsm: VLSM_LESSON,
+  ports: PORTS_LESSON,
+  'packet-journey': PACKET_JOURNEY_LESSON,
 }
 
 /** All interactive concept-lab ids a module offers (new plural field + legacy singular). */
@@ -248,6 +262,36 @@ export function LearnView() {
   const totalAvailable = CURRICULUM.reduce((sum, m) => sum + m.lessons.length, 0)
   const overallPct = totalAvailable ? Math.round((totalDone / totalAvailable) * 100) : 0
 
+  // Learn hub - a linear walk of every teachable lesson in curriculum order, used
+  // to resolve "Continue Learning" (first unfinished lesson you've already reached)
+  // and "Recommended Next" (the lesson to line up after that).
+  const orderedLessons = useMemo(
+    () =>
+      CURRICULUM.filter((m) => !m.comingSoon).flatMap((m) =>
+        m.lessons.map((l) => ({
+          moduleId: m.id,
+          moduleTitle: m.title,
+          level: m.level,
+          lesson: l,
+          done: Boolean(lessons[`${m.id}/${l.id}`]),
+        })),
+      ),
+    [lessons],
+  )
+  const firstIncompleteIdx = orderedLessons.findIndex((x) => !x.done)
+  const anyDone = totalDone > 0
+  const continueItem =
+    anyDone && firstIncompleteIdx >= 0 ? orderedLessons[firstIncompleteIdx] : null
+  const recommendedIdx = continueItem
+    ? orderedLessons.findIndex((x, i) => i > firstIncompleteIdx && !x.done)
+    : firstIncompleteIdx
+  const recommendedItem = recommendedIdx >= 0 ? orderedLessons[recommendedIdx] : null
+
+  const openTo = (moduleId: string, lessonId: string) => {
+    setOpenModuleId(moduleId)
+    setOpenLessonId(lessonId)
+  }
+
   if (openModule && openLesson) {
     return (
       <LessonReader
@@ -278,6 +322,58 @@ export function LearnView() {
 
       <div className="flex-1 overflow-auto p-3">
         <div className="mx-auto max-w-3xl">
+          {(continueItem || recommendedItem) && (
+            <div className="mb-3 grid gap-3 sm:grid-cols-2">
+              {continueItem && (
+                <button
+                  type="button"
+                  onClick={() => openTo(continueItem.moduleId, continueItem.lesson.id)}
+                  className="panel flex flex-col items-start border border-[var(--accent-link)] bg-[var(--accent-link-dim)] p-3 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--accent-link)_22%,transparent)]"
+                >
+                  <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--accent-link)]">
+                    <BookOpen className="h-3 w-3" strokeWidth={2} />
+                    Continue learning
+                  </span>
+                  <span className="mt-1.5 text-[13px] font-bold text-[var(--text-primary)]">
+                    {continueItem.lesson.title}
+                  </span>
+                  <span className="mt-0.5 text-[10px] text-[var(--text-secondary)]">
+                    L{continueItem.level} · {continueItem.moduleTitle} · {continueItem.lesson.minutes} min
+                  </span>
+                  <span className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-link)]">
+                    Continue <ArrowRight className="h-3 w-3" strokeWidth={2} />
+                  </span>
+                </button>
+              )}
+              {recommendedItem && (
+                <button
+                  type="button"
+                  onClick={() => openTo(recommendedItem.moduleId, recommendedItem.lesson.id)}
+                  className="panel flex flex-col items-start border p-3 text-left transition-colors hover:border-[var(--border-bright)] hover:bg-[var(--bg-elevated)]"
+                >
+                  <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">
+                    <Sparkles className="h-3 w-3" strokeWidth={2} />
+                    {continueItem ? 'Recommended next' : 'Start here'}
+                  </span>
+                  <span className="mt-1.5 text-[13px] font-bold text-[var(--text-primary)]">
+                    {recommendedItem.lesson.title}
+                  </span>
+                  <span className="mt-0.5 text-[10px] text-[var(--text-secondary)]">
+                    L{recommendedItem.level} · {recommendedItem.moduleTitle} · {recommendedItem.lesson.minutes} min
+                  </span>
+                  <span className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-[var(--text-secondary)]">
+                    Open lesson <ArrowRight className="h-3 w-3" strokeWidth={2} />
+                  </span>
+                </button>
+              )}
+            </div>
+          )}
+          {!continueItem && !recommendedItem && totalDone > 0 && (
+            <div className="mb-3 flex items-center gap-2 border border-[var(--status-up)] bg-[rgba(63,185,80,0.06)] px-3 py-2 text-[11px] text-[var(--status-up)]">
+              <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Every lesson complete - revisit any module below, or head to the Lab Library for troubleshooting challenges.
+            </div>
+          )}
           <ConceptMasteryPanel />
         </div>
         <div className="mx-auto grid max-w-3xl gap-3">

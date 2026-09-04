@@ -3,31 +3,33 @@ import { getDeviceByIp, getInterfaceById } from './devices'
 import { getNeighborDeviceIds } from './links'
 import { isSameSubnet } from './ip'
 
+/**
+ * The set of devices reachable from `startDeviceId` at Layer 2 - i.e. within
+ * the same broadcast domain. The BFS only ever continues *through* switches: a
+ * router or a host is the edge of a broadcast domain, so it is included in the
+ * result but never expanded past. (A router with legs on two switches will
+ * therefore appear in both segments' domains; every caller filters the result
+ * by the relevant interface's subnet, so that stays correct.)
+ */
 function collectL2Domain(
   devices: Device[],
   links: NetworkLink[],
   startDeviceId: string,
 ): Set<string> {
-  const domain = new Set<string>()
-  const queue = [startDeviceId]
+  const byId = new Map(devices.map((d) => [d.id, d]))
+  const domain = new Set<string>([startDeviceId])
+  const queue: string[] = []
 
-  while (queue.length > 0) {
-    const currentId = queue.shift()!
-    if (domain.has(currentId)) continue
-    domain.add(currentId)
-
-    const current = devices.find((d) => d.id === currentId)
-    if (!current) continue
-
-    const neighbors = getNeighborDeviceIds(links, devices, currentId)
-    for (const neighborId of neighbors) {
-      const neighbor = devices.find((d) => d.id === neighborId)
-      if (!neighbor) continue
-      if (current.type === 'switch' || neighbor.type === 'switch') {
-        queue.push(neighborId)
-      }
+  const expand = (id: string) => {
+    for (const neighborId of getNeighborDeviceIds(links, devices, id)) {
+      if (domain.has(neighborId)) continue
+      domain.add(neighborId)
+      if (byId.get(neighborId)?.type === 'switch') queue.push(neighborId)
     }
   }
+
+  expand(startDeviceId)
+  while (queue.length > 0) expand(queue.shift()!)
 
   return domain
 }

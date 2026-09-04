@@ -133,5 +133,21 @@ export const SUBNETTING_PRACTICE_LESSON: InteractiveLesson = {
       },
       concept: 'network-addresses',
     },
+    {
+      id: 'level-8',
+      kind: 'apply',
+      title: 'Level 8 - Configure and verify',
+      body: 'One of those subnets, on real hosts: give PC1 and PC2 addresses from the plan and confirm they can reach each other.',
+      concept: 'network-addresses',
+      widgetProps: {
+        title: 'Configure a subnet and prove it works',
+        network: '10.20.30.0/26',
+        gatewayIp: '10.20.30.1',
+        hosts: [
+          { name: 'PC1', ip: '10.20.30.10' },
+          { name: 'PC2', ip: '10.20.30.40' },
+        ],
+      },
+    },
   ],
 }

@@ -13,10 +13,23 @@ import { MaskDerivation } from '@/components/learn/interactive/MaskDerivation'
 import { BoundaryBorrowAnimation } from '@/components/learn/interactive/BoundaryBorrowAnimation'
 import { SubnetSplitter } from '@/components/learn/interactive/SubnetSplitter'
 import { AddressBreakdownCard } from '@/components/learn/interactive/AddressBreakdownCard'
+import { AddressCapacityWidget } from '@/components/learn/interactive/AddressCapacityWidget'
 import { TcpHandshakeWidget } from '@/components/learn/interactive/TcpHandshakeWidget'
 import { TcpReliabilityWidget } from '@/components/learn/interactive/TcpReliabilityWidget'
 import { TransportCompareWidget } from '@/components/learn/interactive/TransportCompareWidget'
+import { DhcpDoraWidget } from '@/components/learn/interactive/DhcpDoraWidget'
+import { DnsResolveWidget } from '@/components/learn/interactive/DnsResolveWidget'
+import { NatTranslateWidget } from '@/components/learn/interactive/NatTranslateWidget'
+import { IcmpPingWidget } from '@/components/learn/interactive/IcmpPingWidget'
+import { EthernetFrameWidget } from '@/components/learn/interactive/EthernetFrameWidget'
+import { SwitchLearningWidget } from '@/components/learn/interactive/SwitchLearningWidget'
+import { ArpResolveWidget } from '@/components/learn/interactive/ArpResolveWidget'
+import { RoutingTableWidget } from '@/components/learn/interactive/RoutingTableWidget'
+import { VlsmCompareWidget } from '@/components/learn/interactive/VlsmCompareWidget'
+import { PortDeliveryWidget } from '@/components/learn/interactive/PortDeliveryWidget'
+import { EncapsulationWidget } from '@/components/learn/interactive/EncapsulationWidget'
 import { SubnetDesignChallenge } from '@/components/learn/SubnetDesignChallenge'
+import { LiveSubnetLab } from '@/components/learn/LiveSubnetLab'
 import { useLearnProgress } from '@/store/progressStore'
 import { bumpConcept, useConceptMastery } from '@/store/masteryStore'
 import { celebrateLab } from '@/lib/celebrate'
@@ -28,9 +41,21 @@ const WIDGETS: Record<WidgetKey, (props: Record<string, unknown>) => React.React
   'boundary-borrow': (p) => <BoundaryBorrowAnimation {...p} />,
   'subnet-splitter': (p) => <SubnetSplitter {...p} />,
   'address-breakdown': (p) => <AddressBreakdownCard {...p} />,
+  'address-capacity': (p) => <AddressCapacityWidget {...p} />,
   'tcp-handshake': () => <TcpHandshakeWidget />,
   'tcp-reliability': (p) => <TcpReliabilityWidget {...p} />,
   'transport-compare': () => <TransportCompareWidget />,
+  'dhcp-dora': () => <DhcpDoraWidget />,
+  'dns-resolve': () => <DnsResolveWidget />,
+  'nat-translate': () => <NatTranslateWidget />,
+  'icmp-ping': () => <IcmpPingWidget />,
+  'ethernet-frame': () => <EthernetFrameWidget />,
+  'switch-learning': () => <SwitchLearningWidget />,
+  'arp-resolve': () => <ArpResolveWidget />,
+  'routing-table': () => <RoutingTableWidget />,
+  'vlsm-compare': () => <VlsmCompareWidget />,
+  'port-delivery': () => <PortDeliveryWidget />,
+  'encapsulation': () => <EncapsulationWidget />,
 }
 
 const KIND_LABEL: Record<InteractiveStep['kind'], string> = {
@@ -39,6 +64,7 @@ const KIND_LABEL: Record<InteractiveStep['kind'], string> = {
   interact: 'Try it',
   question: 'Check',
   practice: 'Practice',
+  apply: 'Apply',
 }
 
 export function InteractiveLessonRunner({
@@ -118,9 +144,37 @@ export function InteractiveLessonRunner({
             <ArrowLeft className="h-3.5 w-3.5" />
             Back
           </Button>
-          <Button variant="accent" size="sm" onClick={finish}>
-            <Check className="h-3.5 w-3.5" />
-            Finish lesson
+          <Button variant="accent" size="sm" onClick={atLast ? finish : goNext}>
+            {atLast ? <Check className="h-3.5 w-3.5" /> : null}
+            {atLast ? 'Finish lesson' : 'Next'}
+            {!atLast ? <ArrowRight className="h-3.5 w-3.5" /> : null}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // Apply step: configure a tiny REAL network and ping it.
+  if (step.kind === 'apply') {
+    return (
+      <div className="flex h-full flex-col overflow-hidden">
+        <StepRail lesson={lesson} index={index} progressPct={progressPct} />
+        <div className="min-h-0 flex-1">
+          <LiveSubnetLab
+            onExit={goBack}
+            onComplete={() => awardForStep(step)}
+            {...(step.widgetProps ?? {})}
+          />
+        </div>
+        <div className="flex items-center justify-between border-t border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-2.5">
+          <Button variant="secondary" size="sm" onClick={goBack}>
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back
+          </Button>
+          <Button variant="accent" size="sm" onClick={atLast ? finish : goNext}>
+            {atLast ? <Check className="h-3.5 w-3.5" /> : null}
+            {atLast ? 'Finish lesson' : 'Next'}
+            {!atLast ? <ArrowRight className="h-3.5 w-3.5" /> : null}
           </Button>
         </div>
       </div>

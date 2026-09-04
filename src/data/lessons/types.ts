@@ -15,9 +15,21 @@ export type WidgetKey =
   | 'boundary-borrow'
   | 'subnet-splitter'
   | 'address-breakdown'
+  | 'address-capacity'
   | 'tcp-handshake'
   | 'tcp-reliability'
   | 'transport-compare'
+  | 'dhcp-dora'
+  | 'dns-resolve'
+  | 'nat-translate'
+  | 'icmp-ping'
+  | 'ethernet-frame'
+  | 'switch-learning'
+  | 'arp-resolve'
+  | 'routing-table'
+  | 'vlsm-compare'
+  | 'port-delivery'
+  | 'encapsulation'
 
 export interface StepQuestion {
   prompt: string
@@ -29,7 +41,7 @@ export interface StepQuestion {
 
 export interface InteractiveStep {
   id: string
-  kind: 'teach' | 'demo' | 'interact' | 'question' | 'practice'
+  kind: 'teach' | 'demo' | 'interact' | 'question' | 'practice' | 'apply'
   title: string
   /** 1-3 short sentences. No walls of text. */
   body?: string

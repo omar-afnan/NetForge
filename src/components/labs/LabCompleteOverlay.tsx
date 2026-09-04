@@ -8,7 +8,7 @@ import { labCompletionService, type LabCompletionEvent } from '@/features/labs/c
 /**
  * Full-screen celebration overlay.
  * Subscribes to the one-shot completion-event bus — fires ONLY on a genuine
- * new completion, never replays on nav/reload/Dashboard.
+ * new completion, never replays on nav/reload.
  */
 export function LabCompleteOverlay() {
   const setActiveView = useUIStore((s) => s.setActiveView)

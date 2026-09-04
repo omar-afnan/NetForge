@@ -228,13 +228,13 @@ export async function registerNetForgeWebMCP(): Promise<void> {
 
   await register(
     'netforge_set_view',
-    'Switch the NetForge app to a view: dashboard, topology, issues, labs, traffic, terminal, learn, devicelab or settings.',
+    'Switch the NetForge app to a view: learn, devicelab, topology, issues, labs, traffic, terminal or settings.',
     {
       type: 'object',
       properties: {
         view: {
           type: 'string',
-          enum: ['dashboard', 'topology', 'issues', 'labs', 'traffic', 'terminal', 'learn', 'devicelab', 'settings'],
+          enum: ['learn', 'devicelab', 'topology', 'issues', 'labs', 'traffic', 'terminal', 'settings'],
         },
       },
       required: ['view'],

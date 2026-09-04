@@ -22,7 +22,7 @@ type Events = {
  * moment a lab transitions from incomplete → complete during the current
  * interaction. The event is consumed once and never replays.
  *
- * This prevents the "Lab Complete popup appearing on Dashboard/Lab Library
+ * This prevents the "Lab Complete popup appearing on the Lab Library
  * after navigating away / reloading" bug.
  */
 class LabCompletionService {

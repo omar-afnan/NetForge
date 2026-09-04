@@ -109,6 +109,28 @@ export const IPV4_CIDR_LESSON: InteractiveLesson = {
       concept: 'cidr',
     },
     {
+      id: 'address-capacity',
+      kind: 'interact',
+      title: 'How many addresses does a prefix give you?',
+      body: 'The host bits set the size, and every host bit doubles it: the total is 2 to the power of the host-bit count. Slide the prefix - watch the calculation and the address space grow and shrink.',
+      widget: 'address-capacity',
+      widgetProps: { initialPrefix: 24 },
+      concept: 'cidr',
+    },
+    {
+      id: 'check-capacity',
+      kind: 'question',
+      title: 'Checkpoint: usable hosts',
+      question: {
+        prompt: 'A router-to-router link is numbered as a /30. How many usable host addresses does that leave?',
+        options: ['4', '3', '2', '0'],
+        answerIndex: 2,
+        explain:
+          'A /30 has 2 host bits, so 2^2 = 4 total addresses. Set aside the network address and the broadcast address: 4 - 2 = 2 usable - exactly enough for the two ends of the link.',
+      },
+      concept: 'cidr',
+    },
+    {
       id: 'mask-derivation',
       kind: 'demo',
       title: 'A prefix and a subnet mask are the same thing',
@@ -185,6 +207,22 @@ export const IPV4_CIDR_LESSON: InteractiveLesson = {
       title: 'Practice: design an office network',
       body: 'You have learned the mechanics. Now apply them: carve 192.168.10.0/24 into right-sized subnets for four departments.',
       concept: 'network-addresses',
+    },
+    {
+      id: 'apply',
+      kind: 'apply',
+      title: 'Apply: configure it on real devices',
+      body: 'Take one /24 and put it to work. Configure two PCs from the address plan and ping between them - on the same engine the labs use.',
+      concept: 'network-addresses',
+      widgetProps: {
+        title: 'Configure a /24 and ping across it',
+        network: '192.168.10.0/24',
+        gatewayIp: '192.168.10.1',
+        hosts: [
+          { name: 'PC1', ip: '192.168.10.10' },
+          { name: 'PC2', ip: '192.168.10.20' },
+        ],
+      },
     },
   ],
 }

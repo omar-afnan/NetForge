@@ -1,5 +1,6 @@
 import path from 'node:path'
-import { defineConfig, loadEnv, type PluginOption } from 'vite'
+import { loadEnv, type PluginOption } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -83,5 +84,9 @@ export default defineConfig(({ mode }) => ({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.test.ts'],
   },
 }))

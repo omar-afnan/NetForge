@@ -124,8 +124,7 @@ It always works off the real topology and device config, so any change you make 
 
 | View | What it's for |
 |---|---|
-| **Dashboard** | Stats + device inventory |
-| **Learn** | CCNA-level curriculum. Includes the interactive **Understanding IPv4 & CIDR** concept lab — an octet bit builder, a draggable CIDR explorer, prefix→mask derivation, network/broadcast/host-range breakdown, a subnet splitter, and a subnet-design practice challenge — plus per-concept mastery tracking |
+| **Learn** | The default landing experience. CCNA-level curriculum with **Continue Learning** and **Recommended Next** resume cards, per-concept mastery tracking, and interactive concept labs — an octet bit builder, a draggable CIDR explorer, prefix→mask derivation, network/broadcast/host-range breakdown, a subnet splitter, and a subnet-design practice challenge |
 | **Device Lab** | A separate guided CLI sandbox for practicing device configuration |
 | **Lab Library** | Browse and load troubleshooting labs, see completion badges |
 | **Topology** | The interactive network map — drag, wire, add and inspect devices |

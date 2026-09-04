@@ -5,7 +5,7 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { ContactShadows, Grid, Html, OrbitControls, RoundedBox } from '@react-three/drei'
 import { Cable, Check, ChevronLeft, RotateCcw, Zap } from 'lucide-react'
 import { useDeviceLabStore } from '@/store/deviceLabStore'
-import { faceNormal, findBench, portWorld } from '@/devicelab/hardwareBench'
+import { evalGoal, faceNormal, findBench, portWorld } from '@/devicelab/hardwareBench'
 import type { BenchNode, BenchPort } from '@/devicelab/hardwareBench'
 import { celebrateLab } from '@/lib/celebrate'
 
@@ -231,6 +231,7 @@ function CableTube({
   b,
   kind,
   faulty,
+  removable,
   onClick,
 }: {
   a: [number, number, number]
@@ -238,6 +239,8 @@ function CableTube({
   kind?: 'power' | 'data'
   /** Troubleshooting: this cable is the one the current step wants unplugged. */
   faulty?: boolean
+  /** Free-build mode: any cable can be clicked to remove it (no red glow). */
+  removable?: boolean
   onClick?: () => void
 }): ReactElement {
   const [hover, setHover] = useState(false)
@@ -258,17 +261,18 @@ function CableTube({
   })
 
   const baseColor = kind === 'power' ? '#e0a33e' : '#6f7dff'
+  const interactive = faulty || removable
   return (
     <mesh
       castShadow
-      onPointerOver={faulty ? (e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer' } : undefined}
-      onPointerOut={faulty ? () => { setHover(false); document.body.style.cursor = '' } : undefined}
-      onClick={faulty && onClick ? (e) => { e.stopPropagation(); onClick() } : undefined}
+      onPointerOver={interactive ? (e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer' } : undefined}
+      onPointerOut={interactive ? () => { setHover(false); document.body.style.cursor = '' } : undefined}
+      onClick={interactive && onClick ? (e) => { e.stopPropagation(); onClick() } : undefined}
     >
       <tubeGeometry args={[curve, 44, kind === 'power' ? 0.05 : (faulty ? 0.055 : 0.043), 10, false]} />
       <meshStandardMaterial
         ref={mat}
-        color={faulty ? (hover ? '#ff8a8a' : '#ff5d5d') : baseColor}
+        color={faulty ? (hover ? '#ff8a8a' : '#ff5d5d') : hover && removable ? '#9aa6ff' : baseColor}
         emissive={faulty ? '#ff5d5d' : '#000000'}
         emissiveIntensity={0}
         roughness={0.5}
@@ -292,13 +296,15 @@ interface SceneProps {
   hintIds: Set<string>
   /** Troubleshooting: the mis-cabled link the current step wants unplugged. */
   faultyCable: Cbl | null
+  /** Free-build mode: every cable can be clicked to remove it. */
+  goalMode: boolean
   portState: (id: string) => PortState
   onPortClick: (id: string) => void
   onPower: (node: BenchNode) => void
   onRemoveCable: (c: Cbl) => void
 }
 
-function BenchScene({ bench, cables, connectedIds, poweredIds, booting, hintIds, faultyCable, portState, onPortClick, onPower, onRemoveCable }: SceneProps): ReactElement {
+function BenchScene({ bench, cables, connectedIds, poweredIds, booting, hintIds, faultyCable, goalMode, portState, onPortClick, onPower, onRemoveCable }: SceneProps): ReactElement {
   const portIndex = useMemo(() => {
     const m: Record<string, { node: BenchNode; port: BenchPort }> = {}
     for (const n of bench.nodes) for (const p of n.ports) m[p.id] = { node: n, port: p }
@@ -363,6 +369,7 @@ function BenchScene({ bench, cables, connectedIds, poweredIds, booting, hintIds,
           b={endpoint(c.to)}
           kind={c.cable}
           faulty={!!faultyCable && sameCable(faultyCable, c)}
+          removable={goalMode}
           onClick={() => onRemoveCable(c)}
         />
       ))}
@@ -447,6 +454,10 @@ export function HardwareBench({ benchId, onBack }: { benchId: string; onBack: ()
 
   if (!bench) return null
 
+  const isGoal = !!bench.goal
+  const goalRows = isGoal ? evalGoal(bench, cables, powered) : []
+  const goalDone = goalRows.length > 0 && goalRows.every((r) => r.ok)
+
   const step = bench.steps[stepIndex]
   const connectedIds = new Set<string>(cables.flatMap((c) => [c.from, c.to]))
   const hintIds = new Set<string>(
@@ -495,9 +506,20 @@ export function HardwareBench({ benchId, onBack }: { benchId: string; onBack: ()
     else setStepIndex((i) => i + 1)
   }
 
+  /** Kind of a port id from the bench definition (for guessing power vs data). */
+  const kindOf = (id: string) =>
+    bench.nodes.flatMap((n) => n.ports).find((p) => p.id === id)?.kind
+
   const attempt = (a: string, b: string) => {
     if (cables.some((c) => (c.from === a && c.to === b) || (c.from === b && c.to === a))) {
       setFeedback('Those two are already cabled together.')
+      return
+    }
+    if (isGoal) {
+      // Free build: any port pair makes a cable, no ordering.
+      const isPower = kindOf(a) === 'power' || kindOf(b) === 'power'
+      setCables((prev) => [...prev, { from: a, to: b, cable: isPower ? 'power' : 'data' }])
+      setFeedback(null)
       return
     }
     if (step.type === 'connect' && ((step.from === a && step.to === b) || (step.from === b && step.to === a))) {
@@ -510,6 +532,11 @@ export function HardwareBench({ benchId, onBack }: { benchId: string; onBack: ()
 
   const removeCable = (c: Cbl) => {
     if (done || booting) return
+    if (isGoal) {
+      setCables((prev) => prev.filter((x) => !sameCable(x, c)))
+      setFeedback(null)
+      return
+    }
     if (step?.type === 'fix-remove' && step.from && step.to && sameCable({ from: step.from, to: step.to }, c)) {
       setCables((prev) => prev.filter((x) => !sameCable(x, c)))
       advance()
@@ -568,7 +595,9 @@ export function HardwareBench({ benchId, onBack }: { benchId: string; onBack: ()
         </button>
         <span className="bench-header-tag">{bench.title}</span>
         <span className="bench-progress">
-          {done ? bench.steps.length : stepIndex} / {bench.steps.length} steps
+          {isGoal
+            ? `${goalRows.filter((r) => r.ok).length} / ${goalRows.length} goals`
+            : `${done ? bench.steps.length : stepIndex} / ${bench.steps.length} steps`}
         </span>
         <button type="button" onClick={reset} className="bench-reset" aria-label="Start over">
           <RotateCcw className="h-3.5 w-3.5" />
@@ -585,7 +614,9 @@ export function HardwareBench({ benchId, onBack }: { benchId: string; onBack: ()
                 ? 'Now click the other end of the cable'
                 : step?.type === 'fix-remove'
                   ? 'Click the glowing red cable to unplug it'
-                  : 'Click a port, then click where the cable plugs in'}
+                  : isGoal
+                    ? 'Cable and power freely · click a port then its partner · click a cable to remove it'
+                    : 'Click a port, then click where the cable plugs in'}
             </span>
             <span className="ml-auto text-[10.5px] text-[var(--text-dim)]">drag to orbit · scroll to zoom</span>
           </div>
@@ -602,6 +633,7 @@ export function HardwareBench({ benchId, onBack }: { benchId: string; onBack: ()
                   armed={armed}
                   hintIds={hintIds}
                   faultyCable={faultyCable}
+                  goalMode={isGoal && !done}
                   portState={portState}
                   onPortClick={clickPort}
                   onPower={pressPower}
@@ -636,6 +668,34 @@ export function HardwareBench({ benchId, onBack }: { benchId: string; onBack: ()
                 </button>
               </div>
             </div>
+          ) : isGoal ? (
+            <>
+              <div className="bench-step-tag">Free build · meet the goal</div>
+              <p className="bench-step-instruction">{bench.goal!.brief}</p>
+              <ol className="bench-steplist">
+                {goalRows.map((r) => (
+                  <li key={r.label} className={`bench-steplist-item${r.ok ? ' is-done' : ''}`}>
+                    <span className="bench-steplist-mark">
+                      {r.ok ? <Check className="h-3 w-3" /> : '○'}
+                    </span>
+                    {r.label}
+                  </li>
+                ))}
+              </ol>
+              <button
+                type="button"
+                onClick={() =>
+                  goalDone
+                    ? finish()
+                    : setFeedback(
+                        `${goalRows.filter((r) => !r.ok).length} requirement(s) still unmet - check the list.`,
+                      )
+                }
+                className={goalDone ? 'bench-cta-primary mt-3 w-full' : 'bench-cta-secondary mt-3 w-full'}
+              >
+                {goalDone ? 'Complete build ✓' : 'Check network'}
+              </button>
+            </>
           ) : (
             <>
               {bench.symptom && (

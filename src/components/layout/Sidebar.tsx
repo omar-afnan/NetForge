@@ -3,7 +3,6 @@ import {
   AlertTriangle,
   BookOpen,
   HardDrive,
-  LayoutDashboard,
   Library,
   Network,
   Radio,
@@ -15,7 +14,6 @@ import { useSettingsStore } from '@/store/settingsStore'
 import { useUIStore } from '@/store/uiStore'
 
 const navItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'learn', label: 'Learn', icon: BookOpen },
   { id: 'devicelab', label: 'Device Lab', icon: HardDrive },
   { id: 'labs', label: 'Lab Library', icon: Library },
