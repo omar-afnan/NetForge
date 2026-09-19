@@ -250,6 +250,44 @@ describe('/api/assistant — upstream failures', () => {
     expect(JSON.stringify(r)).not.toContain('secret-account-detail')
   })
 
+  it('surfaces a safe machine code for a misconfigured model (404) and stays a fallback', async () => {
+    process.env.AI_MODEL = 'kira-auto'
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const fetchSpy = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ error: { message: "Model 'kira-auto' is not supported. key=sk-test-secret", type: 'invalid_request_error', code: 'model_not_found' } }),
+          { status: 404 },
+        ),
+    )
+    vi.stubGlobal('fetch', fetchSpy)
+    const r = await call(goodBody)
+    expect(r.status).toBe(200)
+    expect(r.body).toEqual({ fallback: true, reason: 'upstream_404:model_not_found' })
+    expect(fetchSpy).toHaveBeenCalledTimes(1) // 4xx is never retried
+    // The provider's free text is logged server-side with the key redacted, never returned.
+    expect(JSON.stringify(r)).not.toMatch(/not supported|sk-test-secret/)
+    const logged = errSpy.mock.calls.flat().join(' ')
+    expect(logged).toContain('model_not_found')
+    expect(logged).not.toContain('sk-test-secret')
+    delete process.env.AI_MODEL
+  })
+
+  it.each([
+    ['permission', 403, 'model_not_allowed'],
+    ['empty wallet', 402, 'vnd_balance_exhausted'],
+  ])('reports the provider code for %s', async (_n, status, code) => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { code, message: 'x' } }), { status })))
+    expect((await call(goodBody)).body.reason).toBe(`upstream_${status}:${code}`)
+  })
+
+  it('drops provider codes that are not plain identifiers (no injection into the reason)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { code: 'x y<script>' + 'a'.repeat(80), message: 'm' } }), { status: 404 })))
+    expect((await call(goodBody)).body.reason).toBe('upstream_404')
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('not json at all', { status: 404 })))
+    expect((await call(goodBody)).body.reason).toBe('upstream_404')
+  })
+
   it('retries a 5xx once, then falls back', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout'] })
     const fetchSpy = vi.fn(async () => new Response('x', { status: 503 }))

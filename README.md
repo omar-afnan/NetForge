@@ -46,7 +46,7 @@ Chat and takeover planning go through `api/assistant.js`, a small serverless fun
 | Variable | Purpose | Default |
 |---|---|---|
 | `AI_API_KEY` | your API key (server-side only, never shipped to the browser) | — |
-| `AI_MODEL` | model id | `kira-auto` |
+| `AI_MODEL` | model id — must be one your key is allowed to use (Kira: `GET /api/v1/models`, and the key's allow-list) | `kira-3.5-flash` |
 | `AI_BASE_URL` | chat-completions endpoint | `https://kiraai.vn/api/v1/chat/completions` |
 | `CLERK_SECRET_KEY` | verifies the caller's Clerk session (**required in production**) | — |
 | `AI_RATE_LIMIT_PER_MIN` | per-caller request cap | `20` |
@@ -55,7 +55,7 @@ Chat and takeover planning go through `api/assistant.js`, a small serverless fun
 
 **Takeover safety.** AI output is only ever a *proposal*: strict schema check → device/interface/link references must exist → IP/mask/gateway/route values are validated against the live topology right before each change is applied → the simulator re-runs every connectivity test → only `features/labs/verification.ts` may mark a lab complete. An AI that claims success, or proposes nonsense, cannot solve a lab.
 
-If no key is set, or the API is slow or down, the copilot **falls back to a local rule-based engine** so it always answers — it just won't be as smart. Locally, `npm run dev` runs the same function through a small Vite middleware (`vite.config.ts`), so the copilot behaves the same in dev and in production.
+If the provider rejects the request (unknown model, key not permitted, empty wallet, maintenance) the response carries a safe reason such as `upstream_404:model_not_found` — shown in the browser console and, redacted, in the server log — and the copilot uses the local engine. If no key is set, or the API is slow or down, the copilot **falls back to a local rule-based engine** so it always answers — it just won't be as smart. Locally, `npm run dev` runs the same function through a small Vite middleware (`vite.config.ts`), so the copilot behaves the same in dev and in production.
 
 ---
 
@@ -260,7 +260,7 @@ To enable the smart copilot, create a `.env` with at least:
 
 ```
 AI_API_KEY=your-key-here
-AI_MODEL=kira-auto
+AI_MODEL=<a model your key may use>
 ```
 
 Without it, the copilot still runs on its local rule-based engine. With no `VITE_CLERK_PUBLISHABLE_KEY` the app runs in local mode (no sign-in screen). CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm run build`, `npm test`.

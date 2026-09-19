@@ -237,6 +237,25 @@ export function buildUpstreamMessages({ mode, context, messages }) {
   return [{ role: 'system', content: system }, ...messages]
 }
 
+/**
+ * Extract a safe { code, message } from a provider error response. `code` is
+ * only kept if it looks like a plain identifier; `message` is truncated and has
+ * the API key redacted. Never throws.
+ */
+export async function readUpstreamError(response, apiKey) {
+  try {
+    const data = JSON.parse((await response.text()).slice(0, 4000))
+    const err = data?.error ?? data
+    const rawCode = typeof err?.code === 'string' ? err.code : typeof err?.type === 'string' ? err.type : undefined
+    const code = rawCode && /^[A-Za-z0-9_.-]{1,48}$/.test(rawCode) ? rawCode : undefined
+    let message = typeof err?.message === 'string' ? err.message : ''
+    if (apiKey) message = message.split(apiKey).join('[redacted]')
+    return { code, message: message.slice(0, 200) }
+  } catch {
+    return { code: undefined, message: '' }
+  }
+}
+
 function send(res, status, payload, headers = {}) {
   res.setHeader('Cache-Control', 'no-store')
   for (const [k, v] of Object.entries(headers)) res.setHeader(k, v)
@@ -293,9 +312,13 @@ export default async function handler(req, res) {
     }
 
     if (!upstream.ok) {
-      // Status only: upstream bodies can echo request content or account details.
-      console.error('AI upstream error', upstream.status)
-      return send(res, 200, { fallback: true, reason: `upstream_${upstream.status}` })
+      // Callers only ever see the status and a short machine code (e.g.
+      // "upstream_404:model_not_found"); the provider's free-text message stays
+      // in the server log, redacted, so a misconfigured model/key/balance is
+      // diagnosable without exposing account details or echoing request content.
+      const { code, message } = await readUpstreamError(upstream, config.apiKey)
+      console.error('AI upstream error', upstream.status, code ?? '-', message)
+      return send(res, 200, { fallback: true, reason: code ? `upstream_${upstream.status}:${code}` : `upstream_${upstream.status}` })
     }
 
     const data = await upstream.json()

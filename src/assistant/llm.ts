@@ -56,6 +56,15 @@ export function buildContextSnapshot(): string {
   ].join('\n')
 }
 
+let lastFallbackReason: string | undefined
+
+/** Log (once per distinct reason) why the AI backend was skipped, e.g. "upstream_404:model_not_found". */
+function noteFallback(reason: string | undefined) {
+  if (!reason || reason === lastFallbackReason) return
+  lastFallbackReason = reason
+  console.warn(`[copilot] AI backend unavailable (${reason}); using the local engine.`)
+}
+
 function toChatHistory(messages: AssistantMessage[]): { role: 'user' | 'assistant'; content: string }[] {
   return messages
     .filter((m) => m.kind === 'text')
@@ -78,7 +87,8 @@ export async function askLLM(userText: string): Promise<string | null> {
     })
     if (!response.ok) return null
 
-    const data: { reply?: string; fallback?: boolean } = await response.json()
+    const data: { reply?: string; fallback?: boolean; reason?: string } = await response.json()
+    if (data.fallback) noteFallback(data.reason)
     if (data.fallback || typeof data.reply !== 'string' || !data.reply) return null
     return data.reply
   } catch {
@@ -143,7 +153,8 @@ export async function requestLLMPlan(): Promise<LLMPlanResult | null> {
       messages: [{ role: 'user', content: buildNetworkSnapshot() }],
     })
     if (!response.ok) return null
-    const data: { reply?: string; fallback?: boolean } = await response.json()
+    const data: { reply?: string; fallback?: boolean; reason?: string } = await response.json()
+    if (data.fallback) noteFallback(data.reason)
     if (data.fallback || typeof data.reply !== 'string') return null
 
     const { devices, links } = useNetworkStore.getState()
