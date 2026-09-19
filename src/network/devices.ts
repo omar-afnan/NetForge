@@ -1,4 +1,5 @@
 import type { Device, NetworkInterface } from './types'
+import { isValidIpv4 } from './ip'
 
 export function getDeviceById(devices: Device[], id: string): Device | undefined {
   return devices.find((device) => device.id === id)
@@ -32,7 +33,8 @@ export function resolveDeviceRef(devices: Device[], ref: string): Device | undef
 }
 
 export function resolveIpRef(devices: Device[], ref: string): string | undefined {
-  if (ref.includes('.')) return ref
+  // A literal address must be well-formed IPv4; anything else is treated as a name.
+  if (isValidIpv4(ref)) return ref
   const device = resolveDeviceRef(devices, ref)
   if (!device) return undefined
   return getPrimaryInterface(device)?.ipAddress

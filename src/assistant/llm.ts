@@ -11,6 +11,7 @@ import { formatTopologyOverview, summarizeDevice, getSelectedDevice, formatLabIn
 import { useCopilotStore } from '@/store/copilotStore'
 import { useNetworkStore } from '@/store/networkStore'
 import { getAuthToken } from '@/lib/authToken'
+import { parseLLMPlan } from './changeValidation'
 import type { AssistantMessage } from './types'
 import type { ProposedChange } from './types'
 
@@ -96,8 +97,6 @@ export interface LLMPlan {
   changes: ProposedChange[]
 }
 
-const PLAN_KINDS = new Set(['gateway', 'interface', 'interface-status', 'route-add', 'route-remove', 'link-status'])
-
 /** Full network snapshot for the planning prompt - includes link ids so the LLM can restore downed links. */
 export function buildNetworkSnapshot(): string {
   const { devices, links, lab, issues } = useNetworkStore.getState()
@@ -122,103 +121,22 @@ export function buildNetworkSnapshot(): string {
   return lines.join('\n')
 }
 
-/** Pull the first JSON object out of an LLM reply (handles markdown fences / prose). */
-function extractJson(raw: string): Record<string, unknown> | null {
-  const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(raw)
-  const text = fenced ? fenced[1] : raw
-  const start = text.indexOf('{')
-  const end = text.lastIndexOf('}')
-  if (start < 0 || end <= start) return null
-  try {
-    return JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>
-  } catch {
-    return null
-  }
-}
-
-const isStr = (v: unknown): v is string => typeof v === 'string' && v.length > 0
-const isIp = (v: unknown): v is string => isStr(v) && /^\d{1,3}(\.\d{1,3}){3}$/.test(v)
-
-/**
- * Validate LLM-proposed changes against the simulator's supported change
- * schema. Anything malformed, hallucinated, or unsupported is dropped -
- * only changes that `executeChange` can safely run survive.
- */
-function sanitizeChanges(raw: unknown): ProposedChange[] {
-  if (!Array.isArray(raw)) return []
-  const out: ProposedChange[] = []
-  for (const item of raw) {
-    if (typeof item !== 'object' || item === null) continue
-    const c = item as Record<string, unknown>
-    const kind = c.kind
-    if (typeof kind !== 'string' || !PLAN_KINDS.has(kind)) continue
-    const payloadRaw = (typeof c.payload === 'object' && c.payload !== null ? c.payload : {}) as Record<string, unknown>
-    const payload: Record<string, unknown> = {}
-    let valid = true
-
-    switch (kind) {
-      case 'gateway':
-        if (!isIp(payloadRaw.gateway)) valid = false
-        else payload.gateway = payloadRaw.gateway
-        break
-      case 'interface': {
-        if (!isStr(payloadRaw.interfaceRef) || !isIp(payloadRaw.ip)) { valid = false; break }
-        payload.interfaceRef = payloadRaw.interfaceRef
-        payload.ip = payloadRaw.ip
-        if (isIp(payloadRaw.mask)) payload.mask = payloadRaw.mask
-        else if (typeof payloadRaw.prefix === 'number' && payloadRaw.prefix >= 0 && payloadRaw.prefix <= 32) payload.prefix = payloadRaw.prefix
-        else valid = false
-        break
-      }
-      case 'interface-status':
-        if (!isStr(payloadRaw.interfaceRef) || (payloadRaw.status !== 'up' && payloadRaw.status !== 'down')) valid = false
-        else {
-          payload.interfaceRef = payloadRaw.interfaceRef
-          payload.status = payloadRaw.status
-        }
-        break
-      case 'route-add':
-      case 'route-remove': {
-        if (!isIp(payloadRaw.destination)) { valid = false; break }
-        payload.destination = payloadRaw.destination
-        if (isIp(payloadRaw.mask)) payload.mask = payloadRaw.mask
-        else if (typeof payloadRaw.prefix === 'number' && payloadRaw.prefix >= 0 && payloadRaw.prefix <= 32) payload.prefix = payloadRaw.prefix
-        if (kind === 'route-add') {
-          if (!isIp(payloadRaw.nextHop)) { valid = false; break }
-          payload.nextHop = payloadRaw.nextHop
-        }
-        break
-      }
-      case 'link-status':
-        if (!isStr(payloadRaw.linkId) || (payloadRaw.status !== 'up' && payloadRaw.status !== 'down')) valid = false
-        else {
-          payload.linkId = payloadRaw.linkId
-          payload.status = payloadRaw.status
-        }
-        break
-    }
-
-    if (!valid) continue
-    const deviceRef = isStr(c.deviceRef) ? c.deviceRef : undefined
-    if (kind !== 'link-status' && !deviceRef) continue
-    out.push({
-      id: crypto.randomUUID(),
-      kind: kind as ProposedChange['kind'],
-      deviceRef,
-      summary: isStr(c.summary) ? c.summary.slice(0, 200) : `${kind} change`,
-      detail: isStr(c.detail) ? c.detail.slice(0, 300) : undefined,
-      payload,
-    })
-  }
-  return out
+export interface LLMPlanResult extends LLMPlan {
+  /** Why individual proposed changes were dropped (shown to the student). */
+  rejected: string[]
 }
 
 /**
  * Ask the LLM to diagnose the live network and propose a fix plan.
  * Resolves `null` whenever the LLM is unavailable or returns nothing
  * usable - callers must fall back to the local `scanLab()` planner.
+ *
+ * The reply is only ever *proposals*: it is schema-checked and every named
+ * device / interface / link is verified against the live topology here, and
+ * values are re-validated at apply time (executeChange). It never decides
+ * whether a lab is solved.
  */
-export async function requestLLMPlan(): Promise<LLMPlan | null> {
+export async function requestLLMPlan(): Promise<LLMPlanResult | null> {
   try {
     const response = await postAssistant({
       mode: 'plan',
@@ -228,14 +146,10 @@ export async function requestLLMPlan(): Promise<LLMPlan | null> {
     const data: { reply?: string; fallback?: boolean } = await response.json()
     if (data.fallback || typeof data.reply !== 'string') return null
 
-    const parsed = extractJson(data.reply)
-    if (!parsed) return null
-    const changes = sanitizeChanges(parsed.changes)
-    if (changes.length === 0) return null
-    return {
-      reasoning: typeof parsed.reasoning === 'string' ? parsed.reasoning.slice(0, 500) : '',
-      changes,
-    }
+    const { devices, links } = useNetworkStore.getState()
+    const plan = parseLLMPlan(data.reply, { devices, links })
+    if (!plan || plan.changes.length === 0) return null
+    return plan
   } catch {
     return null
   }

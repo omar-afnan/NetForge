@@ -14,10 +14,9 @@ import {
   resolveDeviceRef,
   resolveIpRef,
 } from './devices'
-import { findDeviceOnSubnet, getARPTable as buildArpTable, resolveArp } from './arp'
+import { getARPTable as buildArpTable, resolveNeighbor } from './arp'
 import { isSameSubnet } from './ip'
 import { findBestRoute, getRoutingTable } from './routing'
-import { getNeighborDeviceIds } from './links'
 
 const MAX_HOPS = 16
 
@@ -50,27 +49,28 @@ export class NetworkSimulator {
     return buildArpTable(device, this.devices, this.links)
   }
 
-  private findNextHopRouter(current: Device, nextHopIp: string): Device | undefined {
-    const neighbors = getNeighborDeviceIds(this.links, this.devices, current.id)
-    for (const neighborId of neighbors) {
-      const neighbor = this.devices.find((d) => d.id === neighborId)
-      if (!neighbor) continue
-      if (neighbor.interfaces.some((iface) => iface.ipAddress === nextHopIp && iface.status === 'up')) {
-        return neighbor
-      }
-      if (neighbor.type === 'switch') {
-        const beyond = getNeighborDeviceIds(this.links, this.devices, neighbor.id)
-        for (const id of beyond) {
-          const routed = this.devices.find((d) => d.id === id)
-          if (routed?.interfaces.some((iface) => iface.ipAddress === nextHopIp && iface.status === 'up')) {
-            return routed
-          }
-        }
+  /** IPs owned by more than one device (live interfaces only), with their hostnames. */
+  findDuplicateIps(): { ip: string; devices: string[] }[] {
+    const owners = new Map<string, Set<string>>()
+    for (const device of this.devices) {
+      for (const iface of device.interfaces) {
+        if (!iface.ipAddress || iface.status !== 'up') continue
+        const set = owners.get(iface.ipAddress) ?? new Set<string>()
+        set.add(device.hostname)
+        owners.set(iface.ipAddress, set)
       }
     }
-    return getDeviceByIp(this.devices, nextHopIp)
+    return [...owners]
+      .filter(([, hosts]) => hosts.size > 1)
+      .map(([ip, hosts]) => ({ ip, devices: [...hosts].sort() }))
+      .sort((a, b) => a.ip.localeCompare(b.ip))
   }
 
+  /**
+   * Hop-by-hop forwarding. Every step is decided from live device config and
+   * Layer-2 reachability (see arp.ts): subnet check -> ARP -> route lookup ->
+   * next hop -> TTL. Nothing is assumed reachable just because it exists.
+   */
   forward(sourceRef: string, destinationRef: string): ForwardingResult {
     const sourceDevice = this.resolveDevice(sourceRef)
     const destinationIp = this.resolveIp(destinationRef)
@@ -84,11 +84,21 @@ export class NetworkSimulator {
       }
     }
 
-    const destDevice = getDeviceByIp(this.devices, destinationIp)
+    const duplicates = this.findDuplicateIps()
+    if (duplicates.some((d) => d.ip === destinationIp || d.ip === sourceIp)) {
+      return {
+        success: false,
+        path: [sourceDevice.hostname],
+        failureReason: 'Duplicate IP address',
+        failedAt: sourceDevice.hostname,
+      }
+    }
+
     const path: string[] = [sourceDevice.hostname]
     let current = sourceDevice
-    let currentIp = sourceIp
     const visited = new Set<string>()
+    const owns = (device: Device, ip: string) =>
+      device.interfaces.some((iface) => iface.ipAddress === ip && iface.status === 'up')
 
     for (let hop = 0; hop < MAX_HOPS; hop += 1) {
       if (visited.has(current.id)) {
@@ -96,10 +106,7 @@ export class NetworkSimulator {
       }
       visited.add(current.id)
 
-      if (destinationIp === currentIp) {
-        if (destDevice && !path.includes(destDevice.hostname)) path.push(destDevice.hostname)
-        return { success: true, path }
-      }
+      if (owns(current, destinationIp)) return { success: true, path }
 
       const primary = getPrimaryInterface(current)
       if (!primary?.ipAddress || !primary.subnetMask || primary.status !== 'up') {
@@ -113,8 +120,8 @@ export class NetworkSimulator {
 
       if (current.type === 'pc' || current.type === 'server') {
         if (isSameSubnet(primary.ipAddress, destinationIp, primary.subnetMask)) {
-          const arp = resolveArp(current, destinationIp, this.devices, this.links)
-          if (!arp) {
+          const target = resolveNeighbor(current, primary, destinationIp, this.devices, this.links)
+          if (!target) {
             return {
               success: false,
               path,
@@ -122,8 +129,7 @@ export class NetworkSimulator {
               failedAt: current.hostname,
             }
           }
-          const target = getDeviceByIp(this.devices, destinationIp)
-          if (target) path.push(target.hostname)
+          path.push(target.device.hostname)
           return { success: true, path }
         }
 
@@ -146,8 +152,8 @@ export class NetworkSimulator {
           }
         }
 
-        const gwArp = resolveArp(current, gateway, this.devices, this.links)
-        if (!gwArp) {
+        const gatewayHop = resolveNeighbor(current, primary, gateway, this.devices, this.links)
+        if (!gatewayHop) {
           return {
             success: false,
             path,
@@ -156,32 +162,21 @@ export class NetworkSimulator {
           }
         }
 
-        const gatewayDevice = getDeviceByIp(this.devices, gateway)
-        if (!gatewayDevice) {
-          return {
-            success: false,
-            path,
-            failureReason: 'Gateway unreachable',
-            failedAt: current.hostname,
-          }
-        }
-
-        path.push(gatewayDevice.hostname)
-        current = gatewayDevice
-        currentIp = gateway
+        path.push(gatewayHop.device.hostname)
+        current = gatewayHop.device
         continue
       }
 
-      if (current.type === 'router' || current.type === 'switch') {
-        if (current.type === 'switch') {
-          return {
-            success: false,
-            path,
-            failureReason: 'Switch cannot route packets',
-            failedAt: current.hostname,
-          }
+      if (current.type === 'switch') {
+        return {
+          success: false,
+          path,
+          failureReason: 'Switch cannot route packets',
+          failedAt: current.hostname,
         }
+      }
 
+      if (current.type === 'router') {
         const route = findBestRoute(current, destinationIp)
         if (!route) {
           return {
@@ -192,7 +187,16 @@ export class NetworkSimulator {
           }
         }
 
-        const egress = getInterfaceById(current, route.interfaceId)
+        const egress = route.interfaceId ? getInterfaceById(current, route.interfaceId) : undefined
+        if (route.type === 'static' && !egress) {
+          // A static route whose next hop is not on any connected network.
+          return {
+            success: false,
+            path,
+            failureReason: 'Next hop unreachable',
+            failedAt: current.hostname,
+          }
+        }
         if (!egress || egress.status !== 'up') {
           return {
             success: false,
@@ -202,43 +206,24 @@ export class NetworkSimulator {
           }
         }
 
-        if (route.type === 'connected' && destDevice) {
-          const onSubnet = findDeviceOnSubnet(
-            this.devices,
-            this.links,
-            current,
-            route.interfaceId,
-            destinationIp,
-          )
-          if (onSubnet) {
-            path.push(onSubnet.hostname)
-            return { success: true, path }
-          }
-        }
-
-        const nextHop = route.nextHop
-        if (!nextHop) {
+        // Directly connected: ARP for the destination itself. Otherwise ARP
+        // for the next hop, which must answer on the egress segment.
+        const arpTarget = route.type === 'connected' ? destinationIp : route.nextHop
+        const neighbor = arpTarget
+          ? resolveNeighbor(current, egress, arpTarget, this.devices, this.links)
+          : undefined
+        if (!neighbor) {
           return {
             success: false,
             path,
-            failureReason: 'Missing next hop',
+            failureReason: route.type === 'connected' ? 'Destination host unreachable' : 'Next hop unreachable',
             failedAt: current.hostname,
           }
         }
 
-        const nextDevice = this.findNextHopRouter(current, nextHop)
-        if (!nextDevice) {
-          return {
-            success: false,
-            path,
-            failureReason: 'Next hop unreachable',
-            failedAt: current.hostname,
-          }
-        }
-
-        if (!path.includes(nextDevice.hostname)) path.push(nextDevice.hostname)
-        current = nextDevice
-        currentIp = nextHop
+        path.push(neighbor.device.hostname)
+        if (route.type === 'connected') return { success: true, path }
+        current = neighbor.device
         continue
       }
 

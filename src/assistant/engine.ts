@@ -1,6 +1,7 @@
 import { useCopilotStore } from '@/store/copilotStore'
 import { useNetworkStore } from '@/store/networkStore'
 import { runConnectivityMatrix } from './tools'
+import { verifyAndCompleteLab } from '@/features/labs/verification'
 import { diagnosePing, formatMatrix } from './diagnose'
 import { text, buildPlan, planMessage, executeChange, newId, MODE_HINT } from './engine.core'
 import {
@@ -176,11 +177,10 @@ export function applyPlan(changeIds?: string[]): void {
   const passing = matrix.filter((t) => t.success).length
   const summary = passing === matrix.length ? `Verification: all ${matrix.length} tests pass. 🎉` : `Verification: ${passing}/${matrix.length} tests pass - investigating…`
   store.pushMessage(text(`${summary}\n\n${formatMatrix(matrix)}`))
-  // If the whole lab now passes, mark it completed in the Lab Library.
+  // Completion is decided by the simulator-backed verifier, never by the plan.
   if (passing === matrix.length) {
     const lab = useNetworkStore.getState().lab
-    if (lab.devices.length > 0) {
-      useNetworkStore.getState().completeLab(lab.id, true)
+    if (verifyAndCompleteLab(lab.id, true).solved) {
       store.pushMessage(text(`🎉 "${lab.title}" is solved - all ${matrix.length} tests pass. Marked as Completed in your Lab Library.`))
     }
   }

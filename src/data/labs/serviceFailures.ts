@@ -55,6 +55,14 @@ export const dnsLab: LabDefinition = {
   devices: dnsBaseline.devices,
   links: dnsBaseline.links,
   failures: dnsFailures,
+  // The simulator has no DNS, so the record is modelled as an objective:
+  // the address www.corp.local resolves to must still reach SRV-01.
+  objectives: ['PC-01', 'PC-02', 'PC-03'].map((from) => ({
+    from,
+    to: '10.1.20.10',
+    expectHost: 'SRV-01',
+    description: `www.corp.local (10.1.20.10) must reach SRV-01 from ${from}`,
+  })),
 }
 
 const natBaseline = buildStarterTopology()

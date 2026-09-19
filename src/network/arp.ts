@@ -1,37 +1,81 @@
-import type { ARPEntry, Device, NetworkLink } from './types'
-import { getDeviceByIp, getInterfaceById } from './devices'
-import { getNeighborDeviceIds } from './links'
+import type { ARPEntry, Device, NetworkInterface, NetworkLink } from './types'
 import { isSameSubnet } from './ip'
 
 /**
- * The set of devices reachable from `startDeviceId` at Layer 2 - i.e. within
- * the same broadcast domain. The BFS only ever continues *through* switches: a
- * router or a host is the edge of a broadcast domain, so it is included in the
- * result but never expanded past. (A router with legs on two switches will
- * therefore appear in both segments' domains; every caller filters the result
- * by the relevant interface's subnet, so that stays correct.)
+ * Layer-2 model.
+ *
+ * A frame leaving an interface reaches whatever is cabled to it. Switches
+ * flood to every other live port, so the search continues *through* switches
+ * only; routers and hosts are the edge of a broadcast domain — they are
+ * reachable, but nothing beyond them is. Every hop must be a link that is up
+ * with both endpoint interfaces up, so a dead cable, a shut port or a deleted
+ * device genuinely cuts the path.
  */
-function collectL2Domain(
-  devices: Device[],
-  links: NetworkLink[],
-  startDeviceId: string,
-): Set<string> {
-  const byId = new Map(devices.map((d) => [d.id, d]))
-  const domain = new Set<string>([startDeviceId])
-  const queue: string[] = []
 
-  const expand = (id: string) => {
-    for (const neighborId of getNeighborDeviceIds(links, devices, id)) {
-      if (domain.has(neighborId)) continue
-      domain.add(neighborId)
-      if (byId.get(neighborId)?.type === 'switch') queue.push(neighborId)
+export interface L2Peer {
+  device: Device
+  iface: NetworkInterface
+}
+
+function interfaceById(device: Device, id: string): NetworkInterface | undefined {
+  return device.interfaces.find((i) => i.id === id)
+}
+
+/** Live neighbours directly cabled to one interface (link up, both ends up). */
+function directPeers(devices: Map<string, Device>, links: NetworkLink[], device: Device, iface: NetworkInterface): L2Peer[] {
+  if (iface.status !== 'up') return []
+  const peers: L2Peer[] = []
+  for (const link of links) {
+    if (link.status !== 'up') continue
+    let otherId: string | undefined
+    let otherIfaceId: string | undefined
+    if (link.sourceDeviceId === device.id && link.sourceInterfaceId === iface.id) {
+      otherId = link.targetDeviceId
+      otherIfaceId = link.targetInterfaceId
+    } else if (link.targetDeviceId === device.id && link.targetInterfaceId === iface.id) {
+      otherId = link.sourceDeviceId
+      otherIfaceId = link.sourceInterfaceId
+    }
+    if (!otherId || !otherIfaceId) continue
+    const other = devices.get(otherId)
+    const otherIface = other && interfaceById(other, otherIfaceId)
+    if (other && otherIface && otherIface.status === 'up') peers.push({ device: other, iface: otherIface })
+  }
+  return peers
+}
+
+/**
+ * Every host/router interface in the same broadcast domain as `iface`
+ * (excluding the interface itself), found by flooding through switches.
+ */
+export function l2Peers(devices: Device[], links: NetworkLink[], device: Device, iface: NetworkInterface): L2Peer[] {
+  const byId = new Map(devices.map((d) => [d.id, d]))
+  const endpoints: L2Peer[] = []
+  const seenSwitches = new Set<string>()
+  const queue = directPeers(byId, links, device, iface)
+
+  while (queue.length > 0) {
+    const peer = queue.shift()!
+    if (peer.device.type === 'switch') {
+      if (seenSwitches.has(peer.device.id)) continue
+      seenSwitches.add(peer.device.id)
+      // Flood out of every other live port of the switch.
+      for (const port of peer.device.interfaces) {
+        if (port.id === peer.iface.id) continue
+        queue.push(...directPeers(byId, links, peer.device, port))
+      }
+    } else if (!(peer.device.id === device.id && peer.iface.id === iface.id)) {
+      endpoints.push(peer)
     }
   }
+  return endpoints
+}
 
-  expand(startDeviceId)
-  while (queue.length > 0) expand(queue.shift()!)
-
-  return domain
+/** Deterministic pseudo-age so repeated `show arp` output is stable. */
+function arpAge(ip: string): number {
+  let hash = 0
+  for (const ch of ip) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
+  return (hash % 120) + 1
 }
 
 export function getARPTable(device: Device, devices: Device[], links: NetworkLink[]): ARPEntry[] {
@@ -41,31 +85,45 @@ export function getARPTable(device: Device, devices: Device[], links: NetworkLin
   for (const iface of device.interfaces) {
     if (!iface.ipAddress || !iface.subnetMask || iface.status !== 'up') continue
 
-    const domain = collectL2Domain(devices, links, device.id)
-    for (const memberId of domain) {
-      const member = devices.find((d) => d.id === memberId)
-      if (!member || member.id === device.id) continue
+    for (const peer of l2Peers(devices, links, device, iface)) {
+      const remote = peer.iface
+      if (!remote.ipAddress || !remote.subnetMask) continue
+      if (!isSameSubnet(iface.ipAddress, remote.ipAddress, iface.subnetMask)) continue
 
-      for (const remoteIface of member.interfaces) {
-        if (!remoteIface.ipAddress || !remoteIface.subnetMask || remoteIface.status !== 'up') continue
-        if (!isSameSubnet(iface.ipAddress, remoteIface.ipAddress, iface.subnetMask)) continue
+      const key = `${remote.ipAddress}-${iface.id}`
+      if (seen.has(key)) continue
+      seen.add(key)
 
-        const key = `${remoteIface.ipAddress}-${iface.id}`
-        if (seen.has(key)) continue
-        seen.add(key)
-
-        entries.push({
-          ipAddress: remoteIface.ipAddress,
-          macAddress: remoteIface.macAddress,
-          interfaceId: iface.id,
-          interfaceName: iface.name,
-          age: Math.floor(Math.random() * 120) + 1,
-        })
-      }
+      entries.push({
+        ipAddress: remote.ipAddress,
+        macAddress: remote.macAddress,
+        interfaceId: iface.id,
+        interfaceName: iface.name,
+        age: arpAge(remote.ipAddress),
+      })
     }
   }
 
   return entries.sort((a, b) => a.ipAddress.localeCompare(b.ipAddress))
+}
+
+/**
+ * ARP for `targetIp` out of `egress`: the neighbour that answers, or undefined
+ * if nothing on that broadcast domain owns the address (wrong IP, down
+ * interface, dead link, mask mismatch...).
+ */
+export function resolveNeighbor(
+  device: Device,
+  egress: NetworkInterface,
+  targetIp: string,
+  devices: Device[],
+  links: NetworkLink[],
+): L2Peer | undefined {
+  if (!egress.ipAddress || !egress.subnetMask || egress.status !== 'up') return undefined
+  if (!isSameSubnet(egress.ipAddress, targetIp, egress.subnetMask)) return undefined
+  return l2Peers(devices, links, device, egress).find(
+    (peer) => peer.iface.ipAddress === targetIp && peer.iface.status === 'up',
+  )
 }
 
 export function resolveArp(
@@ -75,30 +133,4 @@ export function resolveArp(
   links: NetworkLink[],
 ): ARPEntry | undefined {
   return getARPTable(device, devices, links).find((entry) => entry.ipAddress === targetIp)
-}
-
-export function findDeviceOnSubnet(
-  devices: Device[],
-  links: NetworkLink[],
-  sourceDevice: Device,
-  egressInterfaceId: string,
-  targetIp: string,
-): Device | undefined {
-  const egress = getInterfaceById(sourceDevice, egressInterfaceId)
-  const egressIp = egress?.ipAddress
-  const egressMask = egress?.subnetMask
-  if (!egressIp || !egressMask) return undefined
-
-  const domain = collectL2Domain(devices, links, sourceDevice.id)
-  for (const memberId of domain) {
-    const member = devices.find((d) => d.id === memberId)
-    if (!member) continue
-    const match = member.interfaces.find((iface) => {
-      if (!iface.ipAddress || iface.status !== 'up') return false
-      return iface.ipAddress === targetIp && isSameSubnet(iface.ipAddress, egressIp, egressMask)
-    })
-    if (match) return member
-  }
-
-  return getDeviceByIp(devices, targetIp)
 }

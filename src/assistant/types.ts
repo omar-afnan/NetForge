@@ -21,6 +21,8 @@ export interface ProposedChange {
   /** Why the assistant wants to make this change. */
   detail?: string
   payload: Record<string, unknown>
+  /** 'ai' = proposed by the LLM: validated against live state before it may run. */
+  source?: 'ai'
 }
 
 /** Compact connectivity test row used across the assistant tools. */

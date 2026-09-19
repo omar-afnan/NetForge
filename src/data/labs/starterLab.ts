@@ -1,6 +1,19 @@
 import type { Device, NetworkInterface, NetworkLink } from '@/network/types'
 import type { FailureInjection } from '@/network/failures'
 
+/**
+ * A named reachability requirement beyond "every endpoint pings every other".
+ * Used where the simulator cannot model the fault directly (e.g. a DNS record
+ * pointing at an address): traffic to the literal `to` address must arrive at
+ * `expectHost`.
+ */
+export interface LabObjective {
+  from: string
+  to: string
+  expectHost: string
+  description: string
+}
+
 export interface LabDefinition {
   id: string
   title: string
@@ -11,6 +24,8 @@ export interface LabDefinition {
   links: NetworkLink[]
   /** Faults applied on top of the baseline topology when the lab loads. */
   failures?: FailureInjection[]
+  /** Extra requirements a solved lab must satisfy (see LabObjective). */
+  objectives?: LabObjective[]
 }
 
 function iface(

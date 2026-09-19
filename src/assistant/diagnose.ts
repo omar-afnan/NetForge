@@ -1,11 +1,13 @@
 import type { ProposedChange } from './types'
-import type { Device } from '@/network/types'
+import type { Device, NetworkInterface } from '@/network/types'
 import { getPrimaryInterface } from '@/network/devices'
-import { formatNetwork, isSameSubnet, isValidIpv4 } from '@/network/ip'
+import { l2Peers } from '@/network/arp'
+import { formatNetwork, getNetworkAddress, intToIp, ipToInt, isSameSubnet, isValidIpv4, maskToPrefix } from '@/network/ip'
 import { useNetworkStore } from '@/store/networkStore'
 import { runConnectivityMatrix } from './tools'
 import type { PingTest } from './types'
 import { getDevices } from './context'
+import { objectiveMet } from '@/features/labs/verification'
 
 /**
  * Root-cause analysis. Reads ONLY live simulator state - no answer keys -
@@ -85,9 +87,150 @@ function findWorkingNextHop(router: Device, destinationIp: string): string | und
   return undefined
 }
 
-function getNetworkAddress(ip: string, mask: string): string {
-  const toInt = (value: string) => value.split('.').reduce((acc, octet) => (acc << 8) + Number(octet), 0) >>> 0
-  return [24, 16, 8, 0].map((shift) => ((toInt(ip) >>> shift) & (toInt(mask) >>> shift) & 255)).join('.')
+/** The router interface sharing a broadcast domain with `host` (its natural gateway). */
+function onLinkRouterIface(host: Device): NetworkInterface | undefined {
+  const { devices, links } = useNetworkStore.getState()
+  const primary = getPrimaryInterface(host)
+  if (!primary?.ipAddress || !primary.subnetMask) return undefined
+  const routers = l2Peers(devices, links, host, primary).filter(
+    (p) => p.device.type === 'router' && p.iface.ipAddress && p.iface.subnetMask,
+  )
+  const own = routers.find((p) => isSameSubnet(p.iface.ipAddress!, primary.ipAddress!, p.iface.subnetMask!))
+  return (own ?? routers[0])?.iface
+}
+
+/** A free host address in `routerIface`'s subnet, preferring the host's own host bits. */
+function freeAddressIn(routerIface: NetworkInterface, preferFrom: string): string | undefined {
+  const mask = ipToInt(routerIface.subnetMask!)
+  const network = ipToInt(getNetworkAddress(routerIface.ipAddress!, routerIface.subnetMask!))
+  const broadcast = (network | (~mask >>> 0)) >>> 0
+  const used = new Set(
+    useNetworkStore.getState().devices.flatMap((d) => d.interfaces.map((i) => i.ipAddress).filter(Boolean)),
+  )
+  const preferred = (network | (ipToInt(preferFrom) & ~mask)) >>> 0
+  const candidates = [preferred]
+  for (let n = network + 1; n < broadcast && candidates.length < 300; n++) candidates.push(n >>> 0)
+  return candidates.map(intToIp).find((ip) => {
+    const n = ipToInt(ip)
+    return n > network && n < broadcast && !used.has(ip)
+  })
+}
+
+/**
+ * Host address audit, judged against the router on the same segment: a host
+ * whose address is outside that router's subnet (bad DHCP scope, typo) or
+ * whose mask disagrees with it is misconfigured whether or not a ping fails.
+ */
+function auditHostAddressing(): { problems: LabProblem[]; fixes: ProposedChange[] } {
+  const problems: LabProblem[] = []
+  const fixes: ProposedChange[] = []
+  for (const host of getDevices()) {
+    if (host.type !== 'pc' && host.type !== 'server') continue
+    const primary = getPrimaryInterface(host)
+    const router = onLinkRouterIface(host)
+    if (!primary?.ipAddress || !primary.subnetMask || !router?.ipAddress || !router.subnetMask) continue
+    const routerPrefix = maskToPrefix(router.subnetMask)
+
+    if (!isSameSubnet(primary.ipAddress, router.ipAddress, router.subnetMask)) {
+      const ip = freeAddressIn(router, primary.ipAddress)
+      problems.push({
+        severity: 'critical',
+        summary: `${host.hostname} has ${primary.ipAddress}, which is outside its LAN ${formatNetwork(router.ipAddress, router.subnetMask)}`,
+        detail: `Its router interface is ${router.ipAddress}/${routerPrefix}; the host must use an address in that subnet.`,
+      })
+      if (ip) {
+        fixes.push({
+          id: crypto.randomUUID(),
+          summary: `Set ${host.hostname} ${primary.name} address → ${ip}/${routerPrefix}`,
+          detail: `${primary.ipAddress} is not on the ${formatNetwork(router.ipAddress, router.subnetMask)} segment`,
+          deviceRef: host.hostname,
+          kind: 'interface',
+          payload: { interfaceRef: primary.name, ip, prefix: routerPrefix },
+        })
+      }
+    } else if (primary.subnetMask !== router.subnetMask) {
+      problems.push({
+        severity: 'critical',
+        summary: `${host.hostname} uses mask ${primary.subnetMask} but its LAN is /${routerPrefix}`,
+        detail: `The router on its segment (${router.ipAddress}) uses ${router.subnetMask}.`,
+      })
+      fixes.push({
+        id: crypto.randomUUID(),
+        summary: `Fix ${host.hostname} ${primary.name} mask → /${routerPrefix}`,
+        detail: `Mask ${primary.subnetMask} disagrees with the router on the segment`,
+        deviceRef: host.hostname,
+        kind: 'interface',
+        payload: { interfaceRef: primary.name, ip: primary.ipAddress, prefix: routerPrefix },
+      })
+    }
+  }
+  return { problems, fixes }
+}
+
+/** Some address inside the network `network` (used to probe reachability). */
+function firstHostOf(network: string): string {
+  return intToIp((ipToInt(network) + 1) >>> 0)
+}
+
+/**
+ * Static-route audit: a route whose next hop is not on a connected network,
+ * or that no live neighbour answers for, can never forward. Replace it with
+ * a next hop that a neighbouring router can demonstrably reach the target through.
+ */
+function auditStaticRoutes(): { problems: LabProblem[]; fixes: ProposedChange[] } {
+  const problems: LabProblem[] = []
+  const fixes: ProposedChange[] = []
+  const { devices, links } = useNetworkStore.getState()
+  for (const router of devices) {
+    if (router.type !== 'router') continue
+    for (const route of router.staticRoutes ?? []) {
+      const egress = route.interfaceId
+        ? router.interfaces.find((i) => i.id === route.interfaceId)
+        : router.interfaces.find((i) => i.ipAddress && i.subnetMask && isSameSubnet(i.ipAddress, route.nextHop, i.subnetMask))
+      // A down egress is a different problem (fixed by enabling the interface).
+      if (egress && egress.status !== 'up') continue
+      const answers = egress
+        ? l2Peers(devices, links, router, egress).some((p) => p.iface.ipAddress === route.nextHop && p.iface.status === 'up')
+        : false
+      if (answers) continue
+
+      const network = formatNetwork(route.destination, route.mask)
+      problems.push({
+        severity: 'critical',
+        summary: `${router.hostname} routes ${network} via ${route.nextHop}, which nothing answers for`,
+        detail: 'The next hop is not on a connected network or its device is unreachable.',
+      })
+      const better = findWorkingNextHop(router, firstHostOf(getNetworkAddress(route.destination, route.mask)))
+      if (better && better !== route.nextHop) {
+        fixes.push({
+          id: crypto.randomUUID(),
+          summary: `Remove bad route on ${router.hostname}: ${network} via ${route.nextHop}`,
+          deviceRef: router.hostname,
+          kind: 'route-remove',
+          payload: { destination: route.destination, mask: route.mask },
+        })
+        fixes.push({
+          id: crypto.randomUUID(),
+          summary: `Add static route on ${router.hostname}: ${network} via ${better}`,
+          deviceRef: router.hostname,
+          kind: 'route-add',
+          payload: { destination: getNetworkAddress(route.destination, route.mask), mask: route.mask, nextHop: better },
+        })
+      }
+    }
+  }
+  return { problems, fixes }
+}
+
+/** True when a cable is attached to this interface (topology data does not always set connectedLinkId). */
+function isCabled(device: Device, iface: NetworkInterface): boolean {
+  return useNetworkStore
+    .getState()
+    .links.some(
+      (l) =>
+        (l.sourceDeviceId === device.id && l.sourceInterfaceId === iface.id) ||
+        (l.targetDeviceId === device.id && l.targetInterfaceId === iface.id),
+    )
 }
 
 /** Turn one failed ping into an explanation + concrete proposed fixes. */
@@ -188,6 +331,16 @@ export function diagnosePing(sourceRef: string, destinationIp: string): Diagnosi
       }
       break
     }
+    case 'Destination host unreachable': {
+      explanation = `${failedAt} routed the packet to the right LAN, but no live device there answers for ${destinationIp} (wrong or missing IP, down interface, or dead cable).`
+      teachingPoint = 'A router that owns the destination subnet ARPs for the host; if nobody replies the ping ends here.'
+      break
+    }
+    case 'Duplicate IP address': {
+      explanation = `More than one device is using ${destinationIp} (or the source address), so replies are ambiguous and the ping is refused. Find the two devices and give one a unique address.`
+      teachingPoint = 'Every IP on a network must be unique - duplicates break ARP because two MACs claim the same address.'
+      break
+    }
     case 'Invalid source or destination': {
       explanation = 'The source or destination could not be resolved. Check that both devices exist and have an IP configured.'
       break
@@ -237,6 +390,38 @@ export function scanLab(): { problems: LabProblem[]; plan: ProposedChange[]; mat
     fixes.push(...diagnosis.fixes)
   }
 
+  // Lab objectives the pairwise matrix cannot express (e.g. a DNS record).
+  {
+    const { lab, devices: liveDevices, simulator } = useNetworkStore.getState()
+    for (const objective of lab.objectives ?? []) {
+      if (objectiveMet(simulator.ping(objective.from, objective.to), objective.expectHost)) continue
+      problems.push({
+        severity: 'critical',
+        summary: `Objective failing: ${objective.description}`,
+        detail: `${objective.to} should be answered by ${objective.expectHost}.`,
+      })
+      const host = liveDevices.find((d) => d.hostname === objective.expectHost)
+      const primary = host && getPrimaryInterface(host)
+      if (host && primary?.subnetMask && primary.ipAddress !== objective.to) {
+        fixes.push({
+          id: crypto.randomUUID(),
+          summary: `Restore ${host.hostname} ${primary.name} address → ${objective.to}`,
+          detail: `${objective.to} is the address clients are configured to use`,
+          deviceRef: host.hostname,
+          kind: 'interface',
+          payload: { interfaceRef: primary.name, ip: objective.to, mask: primary.subnetMask },
+        })
+      }
+    }
+  }
+
+  const addressing = auditHostAddressing()
+  problems.push(...addressing.problems)
+  fixes.push(...addressing.fixes)
+  const routes = auditStaticRoutes()
+  problems.push(...routes.problems)
+  fixes.push(...routes.fixes)
+
   // Proactive scan: endpoints with an IP but no gateway.
   for (const device of getDevices()) {
     const primary = getPrimaryInterface(device)
@@ -271,7 +456,7 @@ export function scanLab(): { problems: LabProblem[]; plan: ProposedChange[]; mat
     }
     // Down interfaces that have a live link attached.
     for (const iface of device.interfaces) {
-      if (iface.status === 'down' && iface.connectedLinkId) {
+      if (iface.status === 'down' && (iface.connectedLinkId || isCabled(device, iface))) {
         problems.push({
           severity: 'critical',
           summary: `${device.hostname} ${iface.name} is administratively down`,

@@ -1,6 +1,7 @@
 import type { Device, NetworkInterface } from '@/network/types'
 import { getInterfaceById, getPrimaryInterface } from '@/network/devices'
 import { isValidIpv4, maskToPrefix, prefixToMask } from '@/network/ip'
+import { isValidMask } from '@/network/sanitize'
 import { useNetworkStore } from '@/store/networkStore'
 import { useCopilotStore } from '@/store/copilotStore'
 import type { PingTest, ToolResult } from './types'
@@ -157,8 +158,8 @@ export function configureInterface(args: {
   } catch {
     return { ok: false, error: `/${args.prefix} is not a valid prefix length (0-32). No changes were made.` }
   }
-  if (!isValidIpv4(mask) || mask.split('.').some((octet) => Number(octet) > 255)) {
-    return { ok: false, error: `"${mask}" is not a valid subnet mask. No changes were made.` }
+  if (!isValidMask(mask)) {
+    return { ok: false, error: `"${mask}" is not a valid subnet mask (it must be contiguous 1-bits, e.g. 255.255.255.0). No changes were made.` }
   }
 
   // Duplicate-IP guard: never let two interfaces share one address.
@@ -258,6 +259,9 @@ export function addStaticRoute(args: {
   } catch {
     return { ok: false, error: `/${args.prefix} is not a valid prefix length (0-32). No changes were made.` }
   }
+  if (!isValidMask(mask)) {
+    return { ok: false, error: `"${mask}" is not a valid subnet mask. No changes were made.` }
+  }
 
   try {
     useNetworkStore.getState().addStaticRoute(device.id, {
@@ -284,7 +288,13 @@ export function removeStaticRoute(args: {
   if (!device) return { ok: false, error: `I couldn't find the device "${args.deviceRef ?? 'you mentioned'}".` }
   if (!isValidIpv4(args.destination)) return { ok: false, error: `"${args.destination}" is not a valid network. No changes were made.` }
 
-  const mask = typeof args.prefix === 'number' ? prefixToMask(args.prefix) : (args.mask ?? '255.255.255.0')
+  let mask: string
+  try {
+    mask = typeof args.prefix === 'number' ? prefixToMask(args.prefix) : (args.mask ?? '255.255.255.0')
+  } catch {
+    return { ok: false, error: `/${args.prefix} is not a valid prefix length (0-32). Nothing was removed.` }
+  }
+  if (!isValidMask(mask)) return { ok: false, error: `"${mask}" is not a valid subnet mask. Nothing was removed.` }
   const existing = (device.staticRoutes ?? []).find(
     (route) => route.destination === args.destination && route.mask === mask,
   )

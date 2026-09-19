@@ -1,5 +1,5 @@
 import type { Device, Route } from './types'
-import { formatNetwork, getNetworkAddress, ipToInt } from './ip'
+import { formatNetwork, getNetworkAddress, ipToInt, isSameSubnet } from './ip'
 
 function routeMetric(destination: string, mask: string): number {
   const destInt = ipToInt(getNetworkAddress(destination, mask))
@@ -23,9 +23,16 @@ export function getRoutingTable(device: Device): Route[] {
   }
 
   for (const route of device.staticRoutes ?? []) {
+    // No explicit egress: use the connected interface whose subnet holds the
+    // next hop, like a router recursing the next hop to a connected route.
     const iface = route.interfaceId
       ? device.interfaces.find((item) => item.id === route.interfaceId)
-      : undefined
+      : device.interfaces.find(
+          (item) =>
+            item.ipAddress &&
+            item.subnetMask &&
+            isSameSubnet(item.ipAddress, route.nextHop, item.subnetMask),
+        )
 
     routes.push({
       destination: getNetworkAddress(route.destination, route.mask),

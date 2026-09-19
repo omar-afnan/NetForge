@@ -200,6 +200,20 @@ export interface SanitizedLab {
   devices: Device[]
   links: NetworkLink[]
   failures?: FailureInjection[]
+  objectives?: { from: string; to: string; expectHost: string; description: string }[]
+}
+
+function sanitizeObjectives(raw: unknown): SanitizedLab['objectives'] {
+  if (!Array.isArray(raw)) return undefined
+  const out: NonNullable<SanitizedLab['objectives']> = []
+  for (const entry of raw.slice(0, 20)) {
+    if (!isRecord(entry)) continue
+    const from = optStr(entry.from, 64)
+    const to = optStr(entry.to, 64)
+    const expectHost = optStr(entry.expectHost, 64)
+    if (from && to && expectHost) out.push({ from, to, expectHost, description: str(entry.description, `${from} must reach ${to}`, 200) })
+  }
+  return out.length > 0 ? out : undefined
 }
 
 export function sanitizeLab(raw: unknown): SanitizedLab | null {
@@ -218,5 +232,6 @@ export function sanitizeLab(raw: unknown): SanitizedLab | null {
     devices,
     links,
     failures: sanitizeFailures(raw.failures),
+    objectives: sanitizeObjectives(raw.objectives),
   }
 }

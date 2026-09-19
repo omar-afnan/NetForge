@@ -318,9 +318,18 @@ function deriveIssues(
 ): NetworkIssue[] {
   void links
   const config = devices.flatMap((device) => auditDeviceConfig(device, devices))
+  const duplicates = simulator.findDuplicateIps().map<NetworkIssue>((dup) => ({
+    id: `dup-ip-${dup.ip}`,
+    severity: 'critical',
+    deviceId: devices.find((d) => d.hostname === dup.devices[0])?.id ?? '',
+    description: `Duplicate IP address ${dup.ip} on ${dup.devices.join(' and ')}`,
+    detectedBy: 'config-audit',
+    evidence: `${dup.devices.join(', ')} all answer for ${dup.ip}`,
+    status: 'open',
+  }))
   const hosts = devices.filter((device) => device.type === 'pc')
   const servers = devices.filter((device) => device.type === 'server')
-  return [...config, ...auditReachability(hosts, servers, simulator)]
+  return [...config, ...duplicates, ...auditReachability(hosts, servers, simulator)]
 }
 
 /** Rebuild the simulator and re-run all audits after any state mutation. */

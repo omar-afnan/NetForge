@@ -2,10 +2,11 @@ import type { AssistStep } from '@/store/copilotStore'
 import { useCopilotStore } from '@/store/copilotStore'
 import { useNetworkStore } from '@/store/networkStore'
 import { useUIStore } from '@/store/uiStore'
-import { ping, runConnectivityMatrix } from './tools'
+import { ping } from './tools'
 import { scanLab, formatMatrix } from './diagnose'
 import { executeChange } from './engine.core'
 import { requestLLMPlan } from './llm'
+import { verifyAndCompleteLab, verifyLab } from '@/features/labs/verification'
 
 import type { ProposedChange } from './types'
 
@@ -151,6 +152,9 @@ export async function runLabAssist(labId: string) {
   if (aiPlan) {
     plan = aiPlan.changes
     if (aiPlan.reasoning) push(`🤖 AI diagnosis: ${aiPlan.reasoning}`)
+    if (aiPlan.rejected.length > 0) {
+      push(`⚠ Ignored ${aiPlan.rejected.length} invalid AI proposal(s):\n${aiPlan.rejected.map((r) => `• ${r}`).join('\n')}`)
+    }
   }
 
   // Nothing to automate - still give a visible takeover moment.
@@ -160,7 +164,7 @@ export async function runLabAssist(labId: string) {
     await delay(600)
     line('Analyzing the network...')
     await delay(800)
-    const allPass = matrix.every((t) => t.success)
+    const allPass = matrix.length > 0 && matrix.every((t) => t.success)
     // A lab with no injected fault (the "Competition Lab" baseline / an empty
     // workspace) has nothing to solve - never claim a completion for it.
     const noFaults = lab.id === 'starter' || (lab.failures?.length ?? 0) === 0
@@ -177,13 +181,16 @@ export async function runLabAssist(labId: string) {
         store.setTakeoverSummary(
           `I analyzed "${lab.title}" - this is the baseline sandbox.\nEvery connectivity test already passes, so there is\nnothing here to fix.\n\nLoad a lab from the Library to start troubleshooting.`,
         )
-      } else {
+      } else if (verifyAndCompleteLab(labId, true).solved) {
         line('✓ Lab objective already met', 'ok')
         store.setTakeoverOutcome('success')
         store.setTakeoverSummary(
           `I analyzed "${lab.title}" and every connectivity test\nalready passes. The lab objective is met.\n\n✓ Lab objective completed`,
         )
-        net.completeLab(labId, true)
+      } else {
+        // The simulator refused (e.g. a required endpoint was deleted): never claim a solve.
+        store.setTakeoverOutcome('partial')
+        store.setTakeoverSummary(`I checked "${lab.title}" but the simulator does not consider it solved.`)
       }
       store.setTakeoverPhase('summary')
       return
@@ -302,9 +309,10 @@ export async function runLabAssist(labId: string) {
         if (ai) scan = { ...scan, plan: ai.changes }
       }
       if (scan.plan.length === 0) {
-        if (scan.matrix.every((t) => t.success)) {
+        const check = verifyLab()
+        if (check.solved) {
           success = true
-          matrixAfter = scan.matrix
+          matrixAfter = check.matrix
         }
         break
       }
@@ -325,7 +333,7 @@ export async function runLabAssist(labId: string) {
         await delay(700)
         // Narrate the concrete configuration change (e.g. gateway OLD → NEW).
         if (change.kind === 'gateway') {
-          const before = net.devices.find((d) => d.hostname === host)?.defaultGateway
+          const before = useNetworkStore.getState().devices.find((d) => d.hostname === host)?.defaultGateway
           line(`${host} gateway: ${before ?? '(none)'} → ${(change.payload as { gateway?: string }).gateway}`, 'warn')
         }
         line(`${change.detail ?? 'Applying configuration'}...`, 'info')
@@ -335,12 +343,12 @@ export async function runLabAssist(labId: string) {
         store.addAction({
           id: crypto.randomUUID(),
           timestamp: new Date().toISOString(),
-          message: `Applied: ${change.summary}`,
+          message: `${outcome.ok ? 'Applied' : 'Rejected'}: ${change.summary}`,
           type: outcome.ok ? 'success' : 'warning',
         })
         line(outcome.ok ? `✓ ${change.summary}` : `⚠ ${change.summary} (check manually)`, outcome.ok ? 'ok' : 'warn')
         push(`${outcome.ok ? '✅' : '❌'} ${host}: ${change.summary}\n${outcome.report}`)
-        applied.push(change)
+        if (outcome.ok) applied.push(change)
         await delay(650)
         net.setHighlightedDevice(null)
       }
@@ -349,9 +357,11 @@ export async function runLabAssist(labId: string) {
     advance(steps.length - 1, 'active')
     line('Verifying lab objective...', 'info')
     await delay(700)
-    matrixAfter = runConnectivityMatrix()
-    const passing = matrixAfter.filter((t) => t.success).length
-    if (passing === matrixAfter.length) {
+    // The simulator - never the AI's plan or its reasoning - decides.
+    const verdict = verifyLab()
+    matrixAfter = verdict.matrix
+    const passing = verdict.passing
+    if (verdict.solved) {
       success = true
       break
     }
@@ -382,8 +392,18 @@ export async function runLabAssist(labId: string) {
 
       // Keep the takeover phase at 'summary' so the overlay typewrites the
       // explanation, then the overlay itself moves to 'complete' and redirects.
+      // Final gate: re-verify against the simulator at the moment of completion
+      // (state may have changed during the animations above).
+      const final = verifyAndCompleteLab(labId, true)
+      if (!final.solved) {
+        store.setTakeoverOutcome('partial')
+        push(`Final verification failed: ${final.reason ?? 'the simulator does not consider the lab solved.'}`)
+        store.setTakeoverSummary(`The last simulator check did not pass, so I did not mark "${lab.title}" complete.
+${final.reason ?? ''}`)
+        store.setTakeoverPhase('summary')
+        return
+      }
       store.setTakeoverOutcome('success')
-      net.completeLab(labId, true)
       push(`✅ Verification passed - all ${matrixAfter.length} connectivity tests are green.\n\n${formatMatrix(matrixAfter)}`)
       store.setTakeoverSummary(
         [

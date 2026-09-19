@@ -10,6 +10,7 @@ import {
 import { prefixToMask } from '@/network/ip'
 import { useCopilotStore } from '@/store/copilotStore'
 import { resolveDevice } from './context'
+import { validateChange } from './changeValidation'
 import type { Device } from '@/network/types'
 
 export function newId(): string {
@@ -32,6 +33,13 @@ export function buildPlan(title: string, rationale: string[], changes: ProposedC
 
 /** Execute one proposed change through the real store-backed tools. */
 export function executeChange(change: ProposedChange): { ok: boolean; report: string } {
+  // AI proposals are untrusted: re-validate against the topology as it is right
+  // now (a previous change in the same plan may have altered it).
+  if (change.source === 'ai') {
+    const { devices, links } = useNetworkStore.getState()
+    const verdict = validateChange(change, { devices, links })
+    if (!verdict.ok) return { ok: false, report: `Rejected - ${verdict.reason}.` }
+  }
   const p = change.payload as {
     interfaceRef?: string
     ip?: string
@@ -58,6 +66,9 @@ export function executeChange(change: ProposedChange): { ok: boolean; report: st
       return wrap(removeStaticRoute({ deviceRef: change.deviceRef, destination: p.destination, mask: p.mask, prefix: p.prefix }))
     case 'link-status': {
       if (!p.linkId) return { ok: false, report: 'Missing link id.' }
+      if (!useNetworkStore.getState().links.some((l) => l.id === p.linkId)) {
+        return { ok: false, report: `No link with id ${p.linkId}.` }
+      }
       useNetworkStore.getState().setLinkStatus(p.linkId, p.status ?? 'up')
       return { ok: true, report: 'Link restored.' }
     }

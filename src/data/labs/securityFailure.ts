@@ -47,7 +47,7 @@ const bossFailures: FailureInjection[] = [
   {
     type: 'wrong_subnet',
     deviceId: 'pc-03',
-    details: { from: '255.255.255.0', to: '255.255.255.240' },
+    details: { from: '255.255.255.0', to: '255.255.255.248' },
   },
   {
     type: 'missing_route',

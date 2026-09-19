@@ -19,6 +19,7 @@ import { useNetworkStore } from '@/store/networkStore'
 import { useCopilotStore } from '@/store/copilotStore'
 import { useUIStore } from '@/store/uiStore'
 import { ping as runPingTool, runConnectivityMatrix } from '@/assistant/tools'
+import { verifyAndCompleteLab } from '@/features/labs/verification'
 import { scanLab } from '@/assistant/diagnose'
 import { executeChange } from '@/assistant/engine.core'
 import { runLabAssist } from '@/assistant/labAssist'
@@ -90,7 +91,6 @@ export function IssueTracker() {
   const revalidate = useNetworkStore((s) => s.revalidate)
   const setPacketTrace = useNetworkStore((s) => s.setPacketTrace)
   const setHighlightedDevice = useNetworkStore((s) => s.setHighlightedDevice)
-  const completeLab = useNetworkStore((s) => s.completeLab)
   const completedLabs = useNetworkStore((s) => s.completedLabs)
   const setActiveView = useUIStore((s) => s.setActiveView)
   const copilot = useCopilotStore()
@@ -421,11 +421,8 @@ export function IssueTracker() {
       setVerification(rows)
 
       // The REAL lab verification: every endpoint pair must pass.
-      const finalMatrix = runConnectivityMatrix()
-      const passing = finalMatrix.filter((t) => t.success).length
-      const resolved = finalMatrix.length > 0 && passing === finalMatrix.length
-      if (resolved) {
-        completeLab(lab.id, strongestAssist.current === 'Full Investigation')
+      const verification = verifyAndCompleteLab(lab.id, strongestAssist.current === 'Full Investigation')
+      if (verification.solved) {
         const record: ResolutionRecord = {
           labId: lab.id,
           issueTitle: lab.title,
@@ -439,9 +436,9 @@ export function IssueTracker() {
         setStatus('resolved')
       }
       pushResult(
-        `VERIFICATION - ${passing}/${finalMatrix.length} connectivity tests passing`,
-        resolved,
-        finalMatrix.map((t) => `${t.success ? '✓' : '✗'} ${t.source} → ${t.destination}`),
+        `VERIFICATION - ${verification.passing}/${verification.total} connectivity tests passing`,
+        verification.solved,
+        verification.matrix.map((t) => `${t.success ? '✓' : '✗'} ${t.source} → ${t.destination}`),
       )
     } finally {
       setBusyTool(null)
