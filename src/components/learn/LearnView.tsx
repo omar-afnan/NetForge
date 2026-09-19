@@ -229,6 +229,24 @@ export function LearnView() {
   const openModule = CURRICULUM.find((m) => m.id === openModuleId)
   const openLesson = openModule?.lessons.find((l) => l.id === openLessonId)
 
+  // NOTE: every hook must run before the early return below (Rules of Hooks) - launching an
+  // interactive lesson used to crash with "Rendered fewer hooks than expected".
+  // Learn hub - a linear walk of every teachable lesson in curriculum order, used
+  // to resolve "Continue Learning" (first unfinished lesson you've already reached)
+  // and "Recommended Next" (the lesson to line up after that).
+  const orderedLessons = useMemo(
+    () =>
+      CURRICULUM.filter((m) => !m.comingSoon).flatMap((m) =>
+        m.lessons.map((l) => ({
+          moduleId: m.id,
+          moduleTitle: m.title,
+          level: m.level,
+          lesson: l,
+          done: Boolean(lessons[`${m.id}/${l.id}`]),
+        })),
+      ),
+    [lessons],
+  )
   if (interactive) {
     const lesson = INTERACTIVE_LESSONS[interactive.lessonId]
     if (lesson) {
@@ -262,22 +280,6 @@ export function LearnView() {
   const totalAvailable = CURRICULUM.reduce((sum, m) => sum + m.lessons.length, 0)
   const overallPct = totalAvailable ? Math.round((totalDone / totalAvailable) * 100) : 0
 
-  // Learn hub - a linear walk of every teachable lesson in curriculum order, used
-  // to resolve "Continue Learning" (first unfinished lesson you've already reached)
-  // and "Recommended Next" (the lesson to line up after that).
-  const orderedLessons = useMemo(
-    () =>
-      CURRICULUM.filter((m) => !m.comingSoon).flatMap((m) =>
-        m.lessons.map((l) => ({
-          moduleId: m.id,
-          moduleTitle: m.title,
-          level: m.level,
-          lesson: l,
-          done: Boolean(lessons[`${m.id}/${l.id}`]),
-        })),
-      ),
-    [lessons],
-  )
   const firstIncompleteIdx = orderedLessons.findIndex((x) => !x.done)
   const anyDone = totalDone > 0
   const continueItem =

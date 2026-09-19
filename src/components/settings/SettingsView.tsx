@@ -1,3 +1,4 @@
+import { resetAllProgress } from '@/lib/resetAll'
 import {
   AlertTriangle,
   Monitor,
@@ -11,9 +12,6 @@ import { Button } from '@/components/ui/button'
 import { starterLab } from '@/data/labs/starterLab'
 import { useNetworkStore } from '@/store/networkStore'
 import { useSettingsStore } from '@/store/settingsStore'
-import { useDeviceLabStore } from '@/store/deviceLabStore'
-import { useLearnProgress } from '@/store/progressStore'
-import { useConceptMastery } from '@/store/masteryStore'
 
 function SettingSection({
   title,
@@ -235,26 +233,7 @@ export function SettingsView() {
                     )
                   )
                     return
-                  // Wipe every known NetForge localStorage key. We touch the keys
-                  // directly (not just the stores) so a future read on a freshly
-                  // loaded page can never restore stale data.
-                  try {
-                    localStorage.removeItem('netforge-network')
-                    localStorage.removeItem('netforge-lab-progress')
-                    localStorage.removeItem('netforge-device-lab')
-                    localStorage.removeItem('netforge-learn-progress')
-                    localStorage.removeItem('netforge-concept-mastery')
-                    localStorage.removeItem('netforge-settings')
-                  } catch {
-                    // ignore quota / private-mode errors
-                  }
-                  // Reset in-memory store state too so the next page load isn't
-                  // briefly backed by stale objects before localStorage is read.
-                  useNetworkStore.getState().resetAllLabs()
-                  useLearnProgress.getState().resetProgress()
-                  useConceptMastery.getState().reset()
-                  useDeviceLabStore.getState().resetAll()
-                  useSettingsStore.getState().resetSettings()
+                  resetAllProgress()
                   window.location.reload()
                 }}
                 className="flex items-center gap-1.5 border border-[var(--accent-amber)] bg-[var(--accent-amber)]/10 px-3 py-1.5 text-[11px] font-medium text-[var(--accent-amber)] transition-colors hover:bg-[var(--accent-amber)]/20"
