@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { finiteNum, isRecord, readPersisted, writePersisted } from '@/lib/persist'
 
 /**
  * Concept mastery - a small, professional progress signal for the Learn view.
@@ -8,6 +9,7 @@ import { create } from 'zustand'
  */
 
 const STORAGE_KEY = 'netforge-concept-mastery'
+const SCHEMA_VERSION = 1
 
 export type ConceptId =
   | 'ipv4-addressing'
@@ -99,26 +101,25 @@ interface MasteryState {
   reset: () => void
 }
 
-function load(): Scores {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { ...EMPTY }
-    const data = JSON.parse(raw)
-    return { ...EMPTY, ...(data.scores ?? {}) }
-  } catch {
-    return { ...EMPTY }
+const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
+
+/** Only known concepts survive; every score is a finite number clamped to 0-100. */
+export function sanitizeScores(raw: unknown): Scores | null {
+  if (!isRecord(raw) || !isRecord(raw.scores)) return null
+  const scores = { ...EMPTY }
+  for (const id of CONCEPT_ORDER) {
+    scores[id] = clamp(finiteNum(raw.scores[id], 0))
   }
+  return scores
+}
+
+function load(): Scores {
+  return readPersisted(STORAGE_KEY, SCHEMA_VERSION, sanitizeScores) ?? { ...EMPTY }
 }
 
 function persist(scores: Scores) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ scores }))
-  } catch {
-    // ignore quota / private-mode errors
-  }
+  writePersisted(STORAGE_KEY, SCHEMA_VERSION, { scores })
 }
-
-const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
 
 export const useConceptMastery = create<MasteryState>((set) => ({
   scores: load(),

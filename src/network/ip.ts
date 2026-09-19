@@ -1,8 +1,11 @@
+const IPV4_RE = /^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$/
+
 export function ipToInt(ip: string): number {
+  // Strict dotted-quad: exactly four decimal octets, no blanks ("1..3.4"),
+  // signs, whitespace, exponents/hex ("0x10", "1e1") or leading zeros.
+  if (typeof ip !== 'string' || !IPV4_RE.test(ip)) throw new Error(`Invalid IPv4 address: ${ip}`)
   const parts = ip.split('.').map(Number)
-  if (parts.length !== 4 || parts.some((p) => Number.isNaN(p) || p < 0 || p > 255)) {
-    throw new Error(`Invalid IPv4 address: ${ip}`)
-  }
+  if (parts.some((p) => p > 255)) throw new Error(`Invalid IPv4 address: ${ip}`)
   return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
 }
 

@@ -8,6 +8,7 @@ import {
 } from '@/devicelab/cli'
 import type { CliDevice, EndpointDevice } from '@/devicelab/cli'
 import { isSameSubnet, isValidIpv4 } from '@/network/ip'
+import { bool, isRecord, nonNegInt, oneOf, readPersisted, str, writePersisted } from '@/lib/persist'
 
 export type DeviceKind = 'router' | 'switch' | 'server' | 'pc'
 
@@ -24,6 +25,7 @@ export interface PingResult {
 }
 
 const STORAGE_KEY = 'netforge-device-lab'
+const SCHEMA_VERSION = 1
 
 interface Persisted {
   progress: Record<DeviceKind, string[]>
@@ -56,14 +58,126 @@ function freshState(): Omit<Persisted, 'progress' | 'benchDone'> {
   }
 }
 
-function loadPersisted(): Partial<Persisted> | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as Partial<Persisted>
-  } catch {
-    return null
+const KINDS: readonly DeviceKind[] = ['router', 'switch', 'server', 'pc']
+const CLI_MODES = ['user', 'privileged', 'config', 'config-if', 'config-line', 'config-vlan'] as const
+const CONSOLE_TONES = ['in', 'out', 'err', 'ok'] as const
+
+const nullableStr = (v: unknown, max = 200): string | null => (typeof v === 'string' ? v.slice(0, max) : null)
+const strList = (v: unknown, max = 500): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(-max).map((x) => x.slice(0, 500)) : []
+
+function sanitizeCli(raw: unknown, fallback: CliDevice): CliDevice {
+  if (!isRecord(raw) || raw.kind !== fallback.kind) return fallback
+  const interfaces = Array.isArray(raw.interfaces)
+    ? raw.interfaces.flatMap((i) => {
+        if (!isRecord(i) || typeof i.name !== 'string' || typeof i.short !== 'string') return []
+        const out: CliDevice['interfaces'][number] = {
+          name: i.name.slice(0, 64),
+          short: i.short.slice(0, 16),
+          status: oneOf(i.status, ['up', 'down', 'admin-down'] as const) ?? 'admin-down',
+          ip: typeof i.ip === 'string' && isValidIpv4(i.ip) ? i.ip : null,
+          mask: typeof i.mask === 'string' && isValidIpv4(i.mask) ? i.mask : null,
+        }
+        const mode = oneOf(i.switchportMode, ['access', 'trunk'] as const)
+        if (mode) out.switchportMode = mode
+        if (typeof i.accessVlan === 'number' && Number.isInteger(i.accessVlan)) out.accessVlan = i.accessVlan
+        return [out]
+      })
+    : fallback.interfaces
+  const routes = Array.isArray(raw.routes)
+    ? raw.routes.flatMap((r) =>
+        isRecord(r) && typeof r.destination === 'string' && isValidIpv4(r.destination) &&
+        typeof r.mask === 'string' && isValidIpv4(r.mask) && typeof r.nextHop === 'string' && isValidIpv4(r.nextHop)
+          ? [{ destination: r.destination, mask: r.mask, nextHop: r.nextHop }]
+          : [],
+      )
+    : []
+  const vlans = Array.isArray(raw.vlans)
+    ? raw.vlans.flatMap((v) =>
+        isRecord(v) && typeof v.id === 'number' && Number.isInteger(v.id) && typeof v.name === 'string'
+          ? [{ id: v.id, name: v.name.slice(0, 64) }]
+          : [],
+      )
+    : []
+  return {
+    kind: fallback.kind,
+    hostname: str(raw.hostname, fallback.hostname, 32) || fallback.hostname,
+    enablePassword: nullableStr(raw.enablePassword),
+    enableSecret: nullableStr(raw.enableSecret),
+    consolePassword: nullableStr(raw.consolePassword),
+    consoleLogin: bool(raw.consoleLogin, false),
+    vtyPassword: nullableStr(raw.vtyPassword),
+    vtyLogin: bool(raw.vtyLogin, false),
+    passwordEncryption: bool(raw.passwordEncryption, false),
+    domainName: nullableStr(raw.domainName),
+    interfaces: interfaces.length > 0 ? interfaces : fallback.interfaces,
+    routes,
+    defaultGateway: typeof raw.defaultGateway === 'string' && isValidIpv4(raw.defaultGateway) ? raw.defaultGateway : null,
+    vlans,
+    startupSaved: bool(raw.startupSaved, false),
+    mode: oneOf(raw.mode, CLI_MODES) ?? 'user',
+    currentInterface: nullableStr(raw.currentInterface, 64),
+    currentLine: oneOf(raw.currentLine, ['console', 'vty'] as const) ?? null,
+    currentVlan: typeof raw.currentVlan === 'number' && Number.isInteger(raw.currentVlan) ? raw.currentVlan : null,
+    awaitingPassword: bool(raw.awaitingPassword, false),
+    badSecrets: nonNegInt(raw.badSecrets),
+    history: strList(raw.history),
   }
+}
+
+function sanitizeEndpoint(raw: unknown, fallback: EndpointDevice): EndpointDevice {
+  if (!isRecord(raw) || raw.kind !== fallback.kind) return fallback
+  const ip = (v: unknown) => (typeof v === 'string' && isValidIpv4(v) ? v : null)
+  const services = isRecord(raw.services) ? raw.services : {}
+  return {
+    kind: fallback.kind,
+    hostname: str(raw.hostname, fallback.hostname, 32) || fallback.hostname,
+    ip: ip(raw.ip),
+    mask: ip(raw.mask),
+    gateway: ip(raw.gateway),
+    dns: ip(raw.dns),
+    services: { web: bool(services.web, false), dns: bool(services.dns, false), dhcp: bool(services.dhcp, false) },
+    linked: bool(raw.linked, true),
+  }
+}
+
+function sanitizeConsole(raw: unknown, fallback: ConsoleLine[]): ConsoleLine[] {
+  if (!Array.isArray(raw)) return fallback
+  const lines = raw.flatMap((l) =>
+    isRecord(l) && typeof l.text === 'string'
+      ? [{ id: str(l.id, crypto.randomUUID(), 64), text: l.text.slice(0, 500), tone: oneOf(l.tone, CONSOLE_TONES) ?? ('out' as const) }]
+      : [],
+  )
+  return lines.length > 0 ? lines.slice(-200) : fallback
+}
+
+/** Rebuild a full, valid Persisted from arbitrary stored JSON. Never throws. */
+export function sanitizeDeviceLab(raw: unknown): Persisted | null {
+  if (!isRecord(raw)) return null
+  const fresh = freshState()
+  const progressIn = isRecord(raw.progress) ? raw.progress : {}
+  const exploredIn = isRecord(raw.explored) ? raw.explored : {}
+  const progress = { router: [], switch: [], server: [], pc: [] } as Record<DeviceKind, string[]>
+  const explored = { router: false, switch: false, server: false, pc: false } as Record<DeviceKind, boolean>
+  for (const kind of KINDS) {
+    progress[kind] = strList(progressIn[kind], 200)
+    explored[kind] = bool(exploredIn[kind], false)
+  }
+  return {
+    progress,
+    benchDone: strList(raw.benchDone, 200),
+    explored,
+    router: sanitizeCli(raw.router, fresh.router),
+    switch: sanitizeCli(raw.switch, fresh.switch),
+    server: sanitizeEndpoint(raw.server, fresh.server),
+    pc: sanitizeEndpoint(raw.pc, fresh.pc),
+    routerConsole: sanitizeConsole(raw.routerConsole, fresh.routerConsole),
+    switchConsole: sanitizeConsole(raw.switchConsole, fresh.switchConsole),
+  }
+}
+
+function loadPersisted(): Persisted | null {
+  return readPersisted(STORAGE_KEY, SCHEMA_VERSION, sanitizeDeviceLab)
 }
 
 function clone<T>(value: T): T {
@@ -104,11 +218,7 @@ function persist(state: DeviceLabState): void {
     routerConsole: state.routerConsole.slice(-200),
     switchConsole: state.switchConsole.slice(-200),
   }
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-  } catch {
-    // ignore quota errors
-  }
+  writePersisted(STORAGE_KEY, SCHEMA_VERSION, data)
 }
 
 const saved = loadPersisted()

@@ -9,6 +9,7 @@
 import type { Device, NetworkLink, NetworkIssue, TraceHop } from '@/network/types'
 import { getPrimaryInterface } from '@/network/devices'
 import { formatNetwork, isSameSubnet, isValidIpv4 } from '@/network/ip'
+import { isRecord, nonNegInt, oneOf, optStr, readPersisted, str, writePersisted } from '@/lib/persist'
 
 export type IssueCategory =
   | 'ip'
@@ -402,23 +403,38 @@ export interface ResolutionRecord {
 
 const HISTORY_KEY = 'netforge-issue-history'
 
-export function loadHistory(labId: string): ResolutionRecord[] {
-  try {
-    const raw = localStorage.getItem(HISTORY_KEY)
-    const all: ResolutionRecord[] = raw ? JSON.parse(raw) : []
-    return all.filter((r) => r.labId === labId)
-  } catch {
-    return []
+const HISTORY_SCHEMA_VERSION = 1
+const MAX_HISTORY = 500
+
+export function sanitizeHistory(raw: unknown): ResolutionRecord[] | null {
+  // Legacy payload was the bare array; versioned payload is `{ records }`.
+  const list = Array.isArray(raw) ? raw : isRecord(raw) && Array.isArray(raw.records) ? raw.records : null
+  if (!list) return null
+  const out: ResolutionRecord[] = []
+  for (const entry of list.slice(-MAX_HISTORY)) {
+    if (!isRecord(entry)) continue
+    const labId = optStr(entry.labId, 100)
+    if (!labId) continue
+    out.push({
+      labId,
+      issueTitle: str(entry.issueTitle, '', 200),
+      solvedBy: oneOf(entry.solvedBy, ['Student', 'AI'] as const) ?? 'Student',
+      attempts: nonNegInt(entry.attempts),
+      aiAssistance: oneOf(entry.aiAssistance, ['None', 'Hint', 'Explain', 'Full Investigation'] as const) ?? 'None',
+      time: str(entry.time, '', 40),
+    })
   }
+  return out
+}
+
+function loadAllHistory(): ResolutionRecord[] {
+  return readPersisted(HISTORY_KEY, HISTORY_SCHEMA_VERSION, sanitizeHistory) ?? []
+}
+
+export function loadHistory(labId: string): ResolutionRecord[] {
+  return loadAllHistory().filter((r) => r.labId === labId)
 }
 
 export function saveResolution(record: ResolutionRecord): void {
-  try {
-    const raw = localStorage.getItem(HISTORY_KEY)
-    const all: ResolutionRecord[] = raw ? JSON.parse(raw) : []
-    all.push(record)
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(all))
-  } catch {
-    // ignore quota errors
-  }
+  writePersisted(HISTORY_KEY, HISTORY_SCHEMA_VERSION, { records: [...loadAllHistory(), record].slice(-MAX_HISTORY) })
 }

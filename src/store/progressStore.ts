@@ -1,6 +1,8 @@
 import { create } from 'zustand'
+import { isRecord, readPersisted, str, writePersisted } from '@/lib/persist'
 
 const STORAGE_KEY = 'netforge-learn-progress'
+const SCHEMA_VERSION = 1
 
 export interface LearnProgress {
   /** Completed lesson keys: `${moduleId}/${lessonId}`. */
@@ -11,23 +13,23 @@ export interface LearnProgress {
   resetProgress: () => void
 }
 
-function load(): Record<string, { completedAt: string }> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return {}
-    const data = JSON.parse(raw)
-    return data.lessons ?? {}
-  } catch {
-    return {}
+/** Legacy (unversioned) payloads were `{ lessons }`; versioned ones store the same object. */
+export function sanitizeLessons(raw: unknown): Record<string, { completedAt: string }> | null {
+  if (!isRecord(raw) || !isRecord(raw.lessons)) return null
+  const out: Record<string, { completedAt: string }> = {}
+  for (const [key, entry] of Object.entries(raw.lessons)) {
+    if (key.length > 200 || !isRecord(entry)) continue
+    out[key] = { completedAt: str(entry.completedAt, '', 40) }
   }
+  return out
+}
+
+function load(): Record<string, { completedAt: string }> {
+  return readPersisted(STORAGE_KEY, SCHEMA_VERSION, sanitizeLessons) ?? {}
 }
 
 function persist(lessons: Record<string, { completedAt: string }>) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ lessons }))
-  } catch {
-    // ignore quota errors
-  }
+  writePersisted(STORAGE_KEY, SCHEMA_VERSION, { lessons })
 }
 
 export const useLearnProgress = create<LearnProgress>((set, get) => ({

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { bool, isRecord, readPersisted, str, writePersisted } from '@/lib/persist'
 
 export interface AppSettings {
   showTopologyGrid: boolean
@@ -10,6 +11,7 @@ export interface AppSettings {
 }
 
 const STORAGE_KEY = 'netforge-settings'
+const SCHEMA_VERSION = 1
 
 const defaultSettings: AppSettings = {
   showTopologyGrid: true,
@@ -20,18 +22,26 @@ const defaultSettings: AppSettings = {
   showLinkPulse: true,
 }
 
-function loadSettings(): AppSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return defaultSettings
-    return { ...defaultSettings, ...JSON.parse(raw) }
-  } catch {
-    return defaultSettings
+/** Field-by-field: unknown keys are dropped, wrong types fall back to defaults. */
+export function sanitizeSettings(raw: unknown): AppSettings | null {
+  if (!isRecord(raw)) return null
+  const d = defaultSettings
+  return {
+    showTopologyGrid: bool(raw.showTopologyGrid, d.showTopologyGrid),
+    glowEffects: bool(raw.glowEffects, d.glowEffects),
+    compactTables: bool(raw.compactTables, d.compactTables),
+    useSelectedDeviceForTerminal: bool(raw.useSelectedDeviceForTerminal, d.useSelectedDeviceForTerminal),
+    defaultTerminalDevice: str(raw.defaultTerminalDevice, d.defaultTerminalDevice, 64) || d.defaultTerminalDevice,
+    showLinkPulse: bool(raw.showLinkPulse, d.showLinkPulse),
   }
 }
 
+function loadSettings(): AppSettings {
+  return readPersisted(STORAGE_KEY, SCHEMA_VERSION, sanitizeSettings) ?? defaultSettings
+}
+
 function saveSettings(settings: AppSettings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+  writePersisted(STORAGE_KEY, SCHEMA_VERSION, settings)
 }
 
 interface SettingsState extends AppSettings {

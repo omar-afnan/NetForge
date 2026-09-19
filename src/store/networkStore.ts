@@ -20,59 +20,104 @@ import { applyFailures, type FailureInjection } from '@/network/failures'
 import { isSameSubnet } from '@/network/ip'
 import { createDevice, nextHostname, planLink } from '@/network/builder'
 import { CABLE_PRESETS } from '@/network/cables'
+import { sanitizeDevices, sanitizeFailures, sanitizeLab, sanitizeLinks } from '@/network/sanitize'
+import { bool, isRecord, nonNegInt, readPersisted, removePersisted, str, writePersisted } from '@/lib/persist'
 
 const STORAGE_KEY = 'netforge-network'
 const LAB_PROGRESS_KEY = 'netforge-lab-progress'
+/** Bump when the persisted network / progress shape changes incompatibly. */
+const NETWORK_SCHEMA_VERSION = 1
+const PROGRESS_SCHEMA_VERSION = 1
 
-function loadPersistedState(): Partial<NetworkState> | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const data = JSON.parse(raw)
-    if (!data.devices || !data.links) return null
-    return data
-  } catch {
-    return null
+type LabProgress = { completed: boolean; completedAt: string; attempts: number; hintsUsed: number; aiAssisted: boolean }
+
+interface PersistedNetwork {
+  lab: LabDefinition
+  baseline: { devices: Device[]; links: NetworkLink[] }
+  devices: Device[]
+  links: NetworkLink[]
+  failures: FailureInjection[]
+  selectedDeviceId: string | null
+  selectedLinkId: string | null
+}
+
+/** Rebuild a trustworthy PersistedNetwork from arbitrary stored JSON, or null. */
+export function sanitizePersistedNetwork(raw: unknown): PersistedNetwork | null {
+  if (!isRecord(raw)) return null
+  const devices = sanitizeDevices(raw.devices)
+  if (!devices) return null
+  const links = sanitizeLinks(raw.links, devices)
+  if (!links) return null
+
+  const lab = sanitizeLab(raw.lab)
+  // The baseline is the pristine lab topology; it must be valid on its own.
+  let baseline: { devices: Device[]; links: NetworkLink[] } | null = null
+  if (isRecord(raw.baseline)) {
+    const bd = sanitizeDevices(raw.baseline.devices)
+    const bl = bd ? sanitizeLinks(raw.baseline.links, bd) : null
+    if (bd && bl) baseline = { devices: bd, links: bl }
+  }
+  baseline ??= lab ? { devices: lab.devices, links: lab.links } : { devices, links }
+
+  return {
+    lab: lab ?? starterLab,
+    baseline,
+    devices,
+    links,
+    failures: sanitizeFailures(raw.failures),
+    selectedDeviceId:
+      typeof raw.selectedDeviceId === 'string' && devices.some((d) => d.id === raw.selectedDeviceId)
+        ? raw.selectedDeviceId
+        : null,
+    selectedLinkId:
+      typeof raw.selectedLinkId === 'string' && links.some((l) => l.id === raw.selectedLinkId)
+        ? raw.selectedLinkId
+        : null,
   }
 }
 
-function loadLabProgress(): Record<string, { completed: boolean; completedAt: string; attempts: number; hintsUsed: number; aiAssisted: boolean }> {
-  try {
-    const raw = localStorage.getItem(LAB_PROGRESS_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, { completed: boolean; completedAt: string; attempts: number; hintsUsed: number; aiAssisted: boolean }>
-    // The starter lab is a baseline/sandbox — it was never supposed to be tracked.
-    // Scrub any legacy entry so old saved data doesn't show a "Completed" badge.
-    if (parsed && typeof parsed === 'object' && 'starter' in parsed) {
-      delete parsed.starter
-      try {
-        localStorage.setItem(LAB_PROGRESS_KEY, JSON.stringify(parsed))
-      } catch {
-        // ignore quota errors
-      }
+export function sanitizeLabProgress(raw: unknown): Record<string, LabProgress> | null {
+  if (!isRecord(raw)) return null
+  const out: Record<string, LabProgress> = {}
+  for (const [labId, entry] of Object.entries(raw)) {
+    // The starter lab is a baseline/sandbox - never tracked. Scrubs legacy entries.
+    if (labId === 'starter' || labId.length > 100 || !isRecord(entry)) continue
+    out[labId] = {
+      completed: bool(entry.completed, false),
+      completedAt: str(entry.completedAt, '', 40),
+      attempts: nonNegInt(entry.attempts),
+      hintsUsed: nonNegInt(entry.hintsUsed),
+      aiAssisted: bool(entry.aiAssisted, false),
     }
-    return parsed ?? {}
-  } catch {
-    return {}
   }
+  return out
 }
 
-function persistLabProgress(progress: Record<string, { completed: boolean; completedAt: string; attempts: number; hintsUsed: number; aiAssisted: boolean }>) {
-  try {
-    localStorage.setItem(LAB_PROGRESS_KEY, JSON.stringify(progress))
-  } catch {
-    // ignore quota errors
-  }
+function loadPersistedState(): PersistedNetwork | null {
+  return readPersisted(STORAGE_KEY, NETWORK_SCHEMA_VERSION, sanitizePersistedNetwork)
+}
+
+function loadLabProgress(): Record<string, LabProgress> {
+  return readPersisted(LAB_PROGRESS_KEY, PROGRESS_SCHEMA_VERSION, sanitizeLabProgress) ?? {}
+}
+
+function persistLabProgress(progress: Record<string, LabProgress>) {
+  writePersisted(LAB_PROGRESS_KEY, PROGRESS_SCHEMA_VERSION, progress)
 }
 
 function persistState(state: NetworkState) {
-  try {
-    // packets is a live, in-memory session log - never persisted.
-    const { simulator, packets, ...rest } = state as any
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(rest))
-  } catch {
-    // ignore quota errors
+  // Only durable topology state is saved. Packets, traces, issues and the
+  // simulator are live/derived and rebuilt on load.
+  const data: PersistedNetwork = {
+    lab: state.lab,
+    baseline: state.baseline,
+    devices: state.devices,
+    links: state.links,
+    failures: state.failures,
+    selectedDeviceId: state.selectedDeviceId,
+    selectedLinkId: state.selectedLinkId,
   }
+  writePersisted(STORAGE_KEY, NETWORK_SCHEMA_VERSION, data)
 }
 
 interface LinkResult {
@@ -92,7 +137,7 @@ interface NetworkState {
   selectedLinkId: string | null
   packetTrace: PacketTrace | null
   highlightedDeviceId: string | null
-  completedLabs: Record<string, { completed: boolean; completedAt: string; attempts: number; hintsUsed: number; aiAssisted: boolean }>
+  completedLabs: Record<string, LabProgress>
   simulator: NetworkSimulator
   baseline: { devices: Device[]; links: NetworkLink[] }
   loadLab: (lab: LabDefinition) => void
@@ -284,22 +329,22 @@ function commit(devices: Device[], links: NetworkLink[]) {
   return { simulator, issues: deriveIssues(devices, links, simulator) }
 }
 
-const persisted: any = loadPersistedState()
+const persisted = loadPersistedState()
 const labProgress = loadLabProgress()
 
 export const useNetworkStore = create<NetworkState>((set, get) => {
   const init = persisted
     ? {
-        lab: persisted.lab ?? starterLab,
-        baseline: persisted.baseline ?? { devices: persisted.devices, links: persisted.links },
+        lab: persisted.lab,
+        baseline: persisted.baseline,
         devices: persisted.devices,
         links: persisted.links,
-        failures: persisted.failures ?? [],
-        proposedFixes: persisted.proposedFixes ?? [],
+        failures: persisted.failures,
+        proposedFixes: [],
         packets: [],
-        selectedDeviceId: persisted.selectedDeviceId ?? null,
-        selectedLinkId: persisted.selectedLinkId ?? null,
-        packetTrace: persisted.packetTrace ?? null,
+        selectedDeviceId: persisted.selectedDeviceId,
+        selectedLinkId: persisted.selectedLinkId,
+        packetTrace: null,
         highlightedDeviceId: null,
         completedLabs: labProgress,
         ...commit(persisted.devices, persisted.links),
@@ -586,11 +631,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => {
   /** Wipe the completion record for every lab. Useful for a full reset. */
   resetAllLabs: () => {
     set({ completedLabs: {} })
-    try {
-      localStorage.removeItem(LAB_PROGRESS_KEY)
-    } catch {
-      // ignore
-    }
+    removePersisted(LAB_PROGRESS_KEY)
   },
   }
 })
