@@ -50,8 +50,9 @@ Chat and takeover planning go through `api/assistant.js`, a small serverless fun
 | `AI_BASE_URL` | chat-completions endpoint | `https://kiraai.vn/api/v1/chat/completions` |
 | `CLERK_SECRET_KEY` | verifies the caller's Clerk session (**required in production**) | — |
 | `AI_RATE_LIMIT_PER_MIN` | per-caller request cap | `20` |
+| `AI_TIMEOUT_MS` | upstream timeout (1000-55000) | `15000` |
 
-**Security model.** The system prompt lives on the server; the browser only sends chat turns and a bounded data snapshot. `/api/assistant` verifies the Clerk session token, rate-limits per user, caps body size / message count / lengths, rejects malformed requests, times out the upstream call after 8s, and never returns upstream error text. With no `CLERK_SECRET_KEY` it runs open only outside production and fails closed (local-engine fallback) in production. The rate limit is in-memory per serverless instance — a cost guard, not a global quota; put Vercel WAF/Upstash in front for a hard limit. Don't put secrets in `VITE_*` variables: those are bundled into the browser.
+**Security model.** The system prompt lives on the server; the browser only sends chat turns and a bounded data snapshot. `/api/assistant` verifies the Clerk session token, rate-limits per user, caps body size / message count / lengths, rejects malformed requests, times out the upstream call (15s by default), and never returns upstream error text. With no `CLERK_SECRET_KEY` it runs open only outside production and fails closed (local-engine fallback) in production. The rate limit is in-memory per serverless instance — a cost guard, not a global quota; put Vercel WAF/Upstash in front for a hard limit. Don't put secrets in `VITE_*` variables: those are bundled into the browser.
 
 **Takeover safety.** AI output is only ever a *proposal*: strict schema check → device/interface/link references must exist → IP/mask/gateway/route values are validated against the live topology right before each change is applied → the simulator re-runs every connectivity test → only `features/labs/verification.ts` may mark a lab complete. An AI that claims success, or proposes nonsense, cannot solve a lab.
 

@@ -288,6 +288,15 @@ describe('/api/assistant — upstream failures', () => {
     expect((await call(goodBody)).body.reason).toBe('upstream_404')
   })
 
+  it('upstream timeout is configurable and clamped', async () => {
+    const { resolveConfig } = await import('./assistant.js' as string) as { resolveConfig: (e: Record<string, string>) => { timeoutMs: number } }
+    expect(resolveConfig({}).timeoutMs).toBe(15_000)
+    expect(resolveConfig({ AI_TIMEOUT_MS: '30000' }).timeoutMs).toBe(30_000)
+    expect(resolveConfig({ AI_TIMEOUT_MS: '5' }).timeoutMs).toBe(1_000)
+    expect(resolveConfig({ AI_TIMEOUT_MS: '999999' }).timeoutMs).toBe(55_000)
+    expect(resolveConfig({ AI_TIMEOUT_MS: 'abc' }).timeoutMs).toBe(15_000)
+  })
+
   it('retries a 5xx once, then falls back', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout'] })
     const fetchSpy = vi.fn(async () => new Response('x', { status: 503 }))

@@ -27,6 +27,7 @@
  *   AI_MODEL    | KIMI_MODEL      — default: "kira-3.5-flash"
  *   CLERK_SECRET_KEY              — enables/enforces caller authentication
  *   AI_RATE_LIMIT_PER_MIN         — per caller, default 20
+ *   AI_TIMEOUT_MS                 — upstream timeout, default 15000 (1000-55000)
  */
 import { verifyToken } from '@clerk/backend'
 
@@ -39,7 +40,8 @@ export const LIMITS = {
   forwardedMessages: 12,
   maxMessageChars: 4_000,
   maxContextChars: 12_000,
-  upstreamTimeoutMs: 8_000,
+  /** Default upstream timeout; real models take 2-6s for a plan, slow ones longer. */
+  upstreamTimeoutMs: 15_000,
   rateWindowMs: 60_000,
 }
 
@@ -99,6 +101,7 @@ export function resolveConfig(env = process.env) {
     // Vite exposes to browser bundles, so never trust it for a real deployment.
     (!isProduction(env) ? env.VITE_AI_API_KEY || env.VITE_KIMI_API_KEY : undefined)
   const rate = Number.parseInt(env.AI_RATE_LIMIT_PER_MIN ?? '', 10)
+  const timeout = Number.parseInt(env.AI_TIMEOUT_MS ?? '', 10)
   return {
     apiKey,
     chatUrl: env.AI_BASE_URL || env.KIMI_BASE_URL || 'https://kiraai.vn/api/v1/chat/completions',
@@ -106,6 +109,7 @@ export function resolveConfig(env = process.env) {
     clerkSecret: env.CLERK_SECRET_KEY || undefined,
     requireAuth: Boolean(env.CLERK_SECRET_KEY) || isProduction(env),
     ratePerMin: Number.isFinite(rate) && rate > 0 ? rate : 20,
+    timeoutMs: Number.isFinite(timeout) ? Math.min(Math.max(timeout, 1_000), 55_000) : LIMITS.upstreamTimeoutMs,
   }
 }
 
@@ -299,7 +303,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
       body: upstreamBody,
-      signal: AbortSignal.timeout(LIMITS.upstreamTimeoutMs),
+      signal: AbortSignal.timeout(config.timeoutMs),
     })
 
   try {

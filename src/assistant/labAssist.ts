@@ -303,7 +303,10 @@ export async function runLabAssist(labId: string) {
     const MAX_ROUNDS = 4
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       let scan = round === 1 ? { problems, plan, matrix } : scanLab()
-      if (round > 1) {
+      if (round > 1 && scan.plan.length === 0) {
+        // The previous round did not solve the lab. The deterministic local
+        // planner goes first from here on; the LLM is only asked again when
+        // it has nothing to propose (so a wrong AI plan cannot loop forever).
         const ai = await requestLLMPlan()
         if (isStale()) throw STALE
         if (ai) scan = { ...scan, plan: ai.changes }

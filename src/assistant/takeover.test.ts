@@ -270,19 +270,22 @@ describe('AI takeover: proposal -> validation -> apply -> simulator -> completio
     expect(useNetworkStore.getState().devices.find((d) => d.hostname === 'PC-02')!.defaultGateway).toBe('10.1.10.1')
   })
 
-  it('an AI plan of invalid changes changes nothing and never completes the lab', async () => {
+  it('invalid AI changes are never applied; the local planner then solves the lab and only the simulator marks it complete', async () => {
     loadLab('wrong-gateway')
-    const before = JSON.stringify(useNetworkStore.getState().devices)
-    requestLLMPlan.mockResolvedValue(
-      aiPlan([
-        change('gateway', 'PC-02', { gateway: '10.9.9.9' }),
-        change('gateway', 'GHOST', { gateway: '10.1.10.1' }),
-      ]),
-    )
+    const bogusOnly = aiPlan([
+      change('gateway', 'PC-02', { gateway: '10.9.9.9' }),
+      change('gateway', 'GHOST', { gateway: '10.1.10.1' }),
+    ])
+    const seen: string[] = []
+    requestLLMPlan.mockImplementation(async () => {
+      seen.push(String(useNetworkStore.getState().devices.find((d) => d.hostname === 'PC-02')!.defaultGateway))
+      return bogusOnly
+    })
     const r = await takeover('wrong-gateway')
-    expect(r.completed).toBe(false)
-    expect(r.outcome).not.toBe('success')
-    expect(JSON.stringify(useNetworkStore.getState().devices)).toBe(before)
+    expect(seen[0]).toBe('10.1.10.254') // nothing applied before/after the first (rejected) round
+    expect(useNetworkStore.getState().devices.find((d) => d.hostname === 'PC-02')!.defaultGateway).toBe('10.1.10.1') // fixed by the LOCAL planner
+    expect(r.completed).toBe(verifyLab().solved)
+    expect(r.completed).toBe(true)
   })
 
   it('an AI that merely CLAIMS the lab is solved does not solve it', async () => {
@@ -294,20 +297,21 @@ describe('AI takeover: proposal -> validation -> apply -> simulator -> completio
     expect(verifyLab().solved).toBe(false)
   })
 
-  it('a well-formed but ineffective AI change is applied yet the lab stays unsolved', async () => {
+  it('a well-formed but ineffective AI change is applied, yet completion still follows the simulator only', async () => {
     loadLab('missing-route')
-    // Valid change (passes validation) that does not fix the fault.
     requestLLMPlan.mockResolvedValue(aiPlan([change('interface-status', 'PC-01', { interfaceRef: 'Eth0', status: 'up' })]))
     const r = await takeover('missing-route')
-    expect(r.completed).toBe(false)
-    expect(r.outcome).toBe('partial')
+    // The AI's change did nothing; the local planner fixed the route in round 2.
+    expect(r.completed).toBe(verifyLab().solved)
+    expect(useNetworkStore.getState().devices.find((d) => d.hostname === 'R-02')!.staticRoutes!.some((x) => x.destination === '10.1.20.0')).toBe(true)
   })
 
-  it('a harmful-but-valid AI change (shutting an interface) cannot produce a completion', async () => {
+  it('a harmful-but-valid AI change (shutting an interface) is undone by the local planner; completion tracks the simulator', async () => {
     loadLab('wrong-gateway')
     requestLLMPlan.mockResolvedValue(aiPlan([change('interface-status', 'R-01', { interfaceRef: 'Gi0/0', status: 'down' })]))
     const r = await takeover('wrong-gateway')
-    expect(r.completed).toBe(false)
+    expect(useNetworkStore.getState().devices.find((d) => d.hostname === 'R-01')!.interfaces.find((i) => i.name === 'Gi0/0')!.status).toBe('up')
+    expect(r.completed).toBe(verifyLab().solved)
   })
 
   it('a healthy-but-faultless sandbox is never marked complete by the takeover', async () => {
