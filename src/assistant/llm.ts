@@ -1,5 +1,5 @@
 /**
- * Bridge from the copilot chat to the Kimi (Moonshot) LLM via the
+ * Bridge from the copilot chat to an OpenAI-compatible LLM via the
  * `/api/assistant` serverless function.
  *
  * The API key never reaches the browser - the function holds it in a
@@ -10,6 +10,7 @@
 import { formatTopologyOverview, summarizeDevice, getSelectedDevice, formatLabInfo } from './context'
 import { useCopilotStore } from '@/store/copilotStore'
 import { useNetworkStore } from '@/store/networkStore'
+import { getAuthToken } from '@/lib/authToken'
 import type { AssistantMessage } from './types'
 import type { ProposedChange } from './types'
 
@@ -29,24 +30,29 @@ function fetchWithTimeout(input: string, init: RequestInit, timeoutMs = LLM_TIME
   })
 }
 
-export function buildSystemPrompt(): string {
-  const lines = [
-    'You are NetForge Copilot, a friendly networking tutor embedded in a network simulator app used by students.',
-    'The student is currently inside a hands-on lab. LIVE snapshot of their simulated network follows.',
-    'Ground your answers in this state when relevant. Be concise, encouraging, and practical.',
-    'You cannot change the network yourself - if a configuration change is needed, tell the student exactly what to change (device, setting, value).',
-    'Prefer short paragraphs and bullet lists. Use Cisco terminology where it aids learning.',
-    '',
-    '--- LIVE NETWORK SNAPSHOT ---',
+/**
+ * POST JSON to the assistant endpoint with the caller's Clerk session token
+ * (when there is one). Only data goes up: the system prompt is owned by the
+ * server, so the client cannot steer the model's instructions.
+ */
+async function postAssistant(payload: unknown): Promise<Response> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const token = await getAuthToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  return fetchWithTimeout('/api/assistant', { method: 'POST', headers, body: JSON.stringify(payload) })
+}
+
+/** Live-network data blob sent as `context`; the server wraps it as untrusted data. */
+export function buildContextSnapshot(): string {
+  const selected = getSelectedDevice()
+  return [
     formatTopologyOverview(),
     '',
     formatLabInfo(),
     '',
     'Selected device:',
-    getSelectedDevice() ? summarizeDevice(getSelectedDevice()!) : '(none)',
-    '--- END SNAPSHOT ---',
-  ]
-  return lines.join('\n')
+    selected ? summarizeDevice(selected) : '(none)',
+  ].join('\n')
 }
 
 function toChatHistory(messages: AssistantMessage[]): { role: 'user' | 'assistant'; content: string }[] {
@@ -65,10 +71,9 @@ export async function askLLM(userText: string): Promise<string | null> {
     const history = toChatHistory(useCopilotStore.getState().messages)
     history.push({ role: 'user', content: userText })
 
-    const response = await fetchWithTimeout('/api/assistant', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ system: buildSystemPrompt(), messages: history }),
+    const response = await postAssistant({
+      context: buildContextSnapshot(),
+      messages: history.slice(-12),
     })
     if (!response.ok) return null
 
@@ -79,25 +84,6 @@ export async function askLLM(userText: string): Promise<string | null> {
     // Includes AbortError on timeout → fall back to the local engine so the
     // chat never freezes waiting on a slow or unresponsive backend.
     return null
-  }
-}
-
-/**
- * True when the serverless function reports a configured key. Used once at
- * startup to show an "AI online" hint in the copilot UI (best-effort).
- */
-export async function llmConfigured(): Promise<boolean> {
-  try {
-    const response = await fetchWithTimeout('/api/assistant', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: [{ role: 'user', content: 'ping' }] }),
-    })
-    if (!response.ok) return false
-    const data: { fallback?: boolean } = await response.json()
-    return data.fallback !== true
-  } catch {
-    return false
   }
 }
 
@@ -234,13 +220,9 @@ function sanitizeChanges(raw: unknown): ProposedChange[] {
  */
 export async function requestLLMPlan(): Promise<LLMPlan | null> {
   try {
-    const response = await fetchWithTimeout('/api/assistant', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        mode: 'plan',
-        messages: [{ role: 'user', content: buildNetworkSnapshot() }],
-      }),
+    const response = await postAssistant({
+      mode: 'plan',
+      messages: [{ role: 'user', content: buildNetworkSnapshot() }],
     })
     if (!response.ok) return null
     const data: { reply?: string; fallback?: boolean } = await response.json()

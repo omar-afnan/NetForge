@@ -9,7 +9,7 @@ import {
   Settings,
   Terminal,
 } from 'lucide-react'
-import { UserButton } from '@clerk/react'
+import { UserMenu } from '@/auth/UserMenu'
 import { useSettingsStore } from '@/store/settingsStore'
 import { useUIStore } from '@/store/uiStore'
 
@@ -69,7 +69,7 @@ export function Sidebar() {
       </nav>
 
       <div className="border-t border-[var(--border)] p-3">
-        <UserButton />
+        <UserMenu />
       </div>
     </aside>
   )

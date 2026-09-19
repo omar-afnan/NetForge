@@ -16,7 +16,7 @@ import { LandingPage } from '@/components/landing/LandingPage'
 import { TakeoverOverlay } from '@/components/assistant/TakeoverOverlay'
 import { useUIStore } from '@/store/uiStore'
 import { useSettingsStore } from '@/store/settingsStore'
-import { useAuth } from '@clerk/react'
+import { useAppAuth } from '@/auth/AuthProvider'
 
 function TopologyView() {
   return (
@@ -44,7 +44,7 @@ function App() {
   const deviceLabCopilotRequested = useUIStore((s) => s.deviceLabCopilotRequested)
   const deviceLabLessonOpen = useUIStore((s) => s.deviceLabLessonOpen)
   const glowEffects = useSettingsStore((s) => s.glowEffects)
-  const { isSignedIn } = useAuth()
+  const { isSignedIn } = useAppAuth()
 
   useEffect(() => {
     document.body.classList.toggle('glow-off', !glowEffects)
@@ -59,7 +59,7 @@ function App() {
     if (isSignedIn && !wasSignedIn.current) {
       useUIStore.getState().setActiveView('learn')
     }
-    wasSignedIn.current = isSignedIn ?? false
+    wasSignedIn.current = isSignedIn
   }, [isSignedIn])
 
   // Avoid blocking the whole app while Clerk finishes initializing.

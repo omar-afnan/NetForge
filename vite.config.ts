@@ -34,15 +34,29 @@ function devAssistantApi(mode: string): PluginOption {
           return
         }
 
+        // Same body cap as production; abort oversized uploads early.
+        const MAX_RAW = 70_000
         let raw = ''
-        for await (const chunk of req) raw += chunk
+        let tooLarge = false
+        for await (const chunk of req) {
+          raw += chunk
+          if (raw.length > MAX_RAW) {
+            tooLarge = true
+            break
+          }
+        }
+        res.setHeader('Content-Type', 'application/json')
+        if (tooLarge) {
+          res.statusCode = 413
+          res.end(JSON.stringify({ error: 'Request too large' }))
+          return
+        }
 
         let body: unknown
         try {
           body = raw ? JSON.parse(raw) : {}
         } catch {
           res.statusCode = 400
-          res.setHeader('Content-Type', 'application/json')
           res.end(JSON.stringify({ error: 'Invalid JSON body' }))
           return
         }
@@ -65,7 +79,7 @@ function devAssistantApi(mode: string): PluginOption {
         try {
           // Fresh import each call so edits to api/assistant.js hot-reload.
           const mod = await server.ssrLoadModule('/api/assistant.js')
-          await mod.default({ method: 'POST', body }, shimRes)
+          await mod.default({ method: 'POST', body, headers: req.headers, socket: req.socket }, shimRes)
         } catch (error) {
           // Never 500 the copilot - tell the client to use its local engine.
           console.error('[dev-assistant-api]', error)
@@ -87,6 +101,6 @@ export default defineConfig(({ mode }) => ({
   },
   test: {
     environment: 'jsdom',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'api/**/*.test.ts'],
   },
 }))

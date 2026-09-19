@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
-import { ClerkProvider } from '@clerk/react'
+import { AuthProvider } from './auth/AuthProvider'
 import './index.css'
 import { registerNetForgeWebMCP } from './webmcp/register'
 
@@ -13,6 +13,8 @@ void registerNetForgeWebMCP().catch((err) => console.warn('[webmcp] registration
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {clerkKey ? <ClerkProvider publishableKey={clerkKey}><App /></ClerkProvider> : <App />}
+    <AuthProvider publishableKey={clerkKey}>
+      <App />
+    </AuthProvider>
   </StrictMode>,
 )
