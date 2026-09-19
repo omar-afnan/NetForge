@@ -48,6 +48,12 @@ Chat and takeover planning go through `api/assistant.js`, a small serverless fun
 | `AI_API_KEY` | your API key (server-side only, never shipped to the browser) | — |
 | `AI_MODEL` | model id | `kira-auto` |
 | `AI_BASE_URL` | chat-completions endpoint | `https://kiraai.vn/api/v1/chat/completions` |
+| `CLERK_SECRET_KEY` | verifies the caller's Clerk session (**required in production**) | — |
+| `AI_RATE_LIMIT_PER_MIN` | per-caller request cap | `20` |
+
+**Security model.** The system prompt lives on the server; the browser only sends chat turns and a bounded data snapshot. `/api/assistant` verifies the Clerk session token, rate-limits per user, caps body size / message count / lengths, rejects malformed requests, times out the upstream call after 8s, and never returns upstream error text. With no `CLERK_SECRET_KEY` it runs open only outside production and fails closed (local-engine fallback) in production. The rate limit is in-memory per serverless instance — a cost guard, not a global quota; put Vercel WAF/Upstash in front for a hard limit. Don't put secrets in `VITE_*` variables: those are bundled into the browser.
+
+**Takeover safety.** AI output is only ever a *proposal*: strict schema check → device/interface/link references must exist → IP/mask/gateway/route values are validated against the live topology right before each change is applied → the simulator re-runs every connectivity test → only `features/labs/verification.ts` may mark a lab complete. An AI that claims success, or proposes nonsense, cannot solve a lab.
 
 If no key is set, or the API is slow or down, the copilot **falls back to a local rule-based engine** so it always answers — it just won't be as smart. Locally, `npm run dev` runs the same function through a small Vite middleware (`vite.config.ts`), so the copilot behaves the same in dev and in production.
 
@@ -115,6 +121,9 @@ Every lab starts from the same enterprise topology and injects a specific fault 
 - Routing-table lookups, connected routes and static routes
 - Interface status (a down interface breaks ARP, ping and routing)
 - End-to-end reachability and the exact packet path
+- Layer 2 per interface: a down cable, shut port, or deleted switch/router really cuts the path; duplicate IPs are detected
+
+NAT, DNS and DHCP are taught through the interactive lessons and expressed in labs as address/route faults — the engine does not translate addresses or resolve names.
 
 It always works off the real topology and device config, so any change you make — in the canvas, the terminal, the copilot, or a WebMCP tool — actually affects whether traffic gets through.
 
@@ -148,6 +157,22 @@ It always works off the real topology and device config, so any change you make 
 
 ---
 
+## Architecture
+
+```
+React UI  →  Zustand stores  →  NetworkSimulator  →  ARP / Routing / ICMP / Traceroute
+                                      ▲
+                       features/labs/verification.ts  (only thing that can complete a lab)
+
+React  →  /api/assistant  →  OpenAI-compatible provider
+          (Clerk auth, rate limit, server-owned prompt)
+React  →  assistant/changeValidation  →  apply  →  simulator verification
+
+Browser / agent  →  WebMCP (document.modelContext)  →  NetForge simulator state
+```
+
+---
+
 ## Project structure
 
 ```
@@ -175,13 +200,16 @@ src/
     builder.ts / devices.ts / links.ts / interfaces.ts / packets.ts
     types.ts
 
+  auth/                      # AuthProvider: Clerk when configured, local mode otherwise
+  features/labs/verification.ts  # Simulator-backed "is this lab solved?"
   data/labs/                 # LabDefinition + all 9 labs + baseline topology
 
   assistant/
     engine.ts                # Message router (rule engine vs LLM)
     engine.core.ts / engine.handlers.ts / engine.handlers2.ts
     parse.ts                 # Natural-language command parser
-    llm.ts                   # Bridge to /api/assistant + response validation
+    llm.ts                   # Bridge to /api/assistant
+    changeValidation.ts      # Strict validation of AI-proposed changes
     tools.ts / diagnose.ts   # Connectivity matrix + root-cause analysis
     labAssist.ts             # AI takeover: step-by-step lab solving
     knowledge.ts / context.ts / types.ts
@@ -212,6 +240,8 @@ State is local to the browser (`localStorage`), so your work survives a refresh:
 | `netforge-device-lab` | Device Lab sandbox state |
 | `netforge-settings` | UI preferences |
 
+Each value is stored as `{ v, data }` (`src/lib/persist.ts`); older unversioned data is migrated on read, and corrupt, outdated or unavailable storage falls back to defaults instead of crashing.
+
 Settings → *Reset all progress* clears every one of these.
 
 ---
@@ -222,6 +252,7 @@ Settings → *Reset all progress* clears every one of these.
 npm install
 npm run dev        # dev server (includes the /api/assistant bridge)
 npm run build      # type-check + production build
+npm test           # vitest: simulator, labs, AI takeover, WebMCP, persistence, API
 npm run preview    # preview the production build
 ```
 
@@ -232,7 +263,7 @@ AI_API_KEY=your-key-here
 AI_MODEL=kira-auto
 ```
 
-Without it, the copilot still runs on its local rule-based engine.
+Without it, the copilot still runs on its local rule-based engine. With no `VITE_CLERK_PUBLISHABLE_KEY` the app runs in local mode (no sign-in screen). CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm run build`, `npm test`.
 
 ---
 

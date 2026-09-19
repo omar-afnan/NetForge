@@ -175,6 +175,7 @@ export function SettingsView() {
               description="Fallback host when no device is selected."
             >
               <select
+                aria-label="Default terminal device"
                 value={settings.defaultTerminalDevice}
                 onChange={(e) => settings.updateSettings({ defaultTerminalDevice: e.target.value })}
                 disabled={settings.useSelectedDeviceForTerminal}
