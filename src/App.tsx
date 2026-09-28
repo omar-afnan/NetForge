@@ -18,6 +18,7 @@ import { useUIStore } from '@/store/uiStore'
 import { useSettingsStore } from '@/store/settingsStore'
 import { useAuth } from '@clerk/react'
 import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 
 function TopologyView() {
   return (
@@ -140,6 +141,7 @@ function App() {
       {main}
       <LabCompleteOverlay />
       <Analytics />
+      <SpeedInsights />
     </AppShell>
   )
 }
