@@ -17,6 +17,7 @@ import { TakeoverOverlay } from '@/components/assistant/TakeoverOverlay'
 import { useUIStore } from '@/store/uiStore'
 import { useSettingsStore } from '@/store/settingsStore'
 import { useAuth } from '@clerk/react'
+import { Analytics } from '@vercel/analytics/react'
 
 function TopologyView() {
   return (
@@ -138,6 +139,7 @@ function App() {
     <AppShell rightPanel={right} bottomPanel={bottom}>
       {main}
       <LabCompleteOverlay />
+      <Analytics />
     </AppShell>
   )
 }
